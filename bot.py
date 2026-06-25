@@ -56,9 +56,43 @@ async def clear_history(user_id: str):
     await conn.execute("DELETE FROM chat_history WHERE user_id = $1", user_id)
     await conn.close()
 
-# ===== دستورات =====
+# ===== دستور /start =====
+async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_name = update.effective_user.first_name or "کاربر عزیز"
+    
+    welcome_text = f"""
+🌟 **به ربات هوشمند خوش آمدید، {user_name}!** 🌟
+
+🤖 من یک دستیار قدرتمند هستم که با استفاده از هوش مصنوعی به سوالات شما پاسخ می‌دهم.
+
+✨ **قابلیت‌های من:**
+• 💬 پاسخ به سوالات شما به زبان فارسی
+• 🧠 حافظه‌ی دائمی برای هر کاربر (تا ۲۰ پیام آخر)
+• 📊 نمایش وضعیت مدل‌های هوش مصنوعی
+• 🔄 انتخاب خودکار بهترین مدل توسط FreeLLMAPI
+• 🤖 نمایش نام مدل پاسخ‌دهنده در انتهای هر پیام
+
+📌 **دستورات مفید:**
+• `/status` – وضعیت مدل‌های موجود
+• `/clear` – پاک کردن حافظه‌ی مکالمه
+• `/start` – نمایش این پیام
+
+💡 فقط کافی است سوال خود را بپرسید و من پاسخ می‌دهم!
+    """
+    
+    keyboard = [
+        [InlineKeyboardButton("📊 وضعیت مدل‌ها", callback_data="status_btn")],
+        [InlineKeyboardButton("🧹 پاک کردن حافظه", callback_data="clear_btn")],
+        [InlineKeyboardButton("📖 راهنما", callback_data="help_btn")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text(welcome_text, parse_mode="Markdown", reply_markup=reply_markup)
+
+# ===== دستور /status =====
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     status_msg = await update.message.reply_text("⏳ در حال دریافت وضعیت مدل‌ها...")
+    
     try:
         response = requests.get(
             f"{BASE_URL}/models",
@@ -71,6 +105,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not models:
                 await status_msg.edit_text("❌ هیچ مدلی در دسترس نیست.")
                 return
+            
             available, unavailable, limited = [], [], []
             for model in models:
                 model_id = model.get("id", "نامشخص")
@@ -83,17 +118,28 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     limited.append(model_id)
                 else:
                     available.append(model_id)
-            reply = "📊 **وضعیت لحظه‌ای مدل‌ها**\n\n"
+            
+            reply = "📊 **وضعیت لحظه‌ای مدل‌ها**\n"
+            reply += "─" * 25 + "\n\n"
+            
             if available:
-                reply += "✅ **در دسترس:**\n" + "\n".join([f"• {m}" for m in available[:20]]) + "\n\n"
+                reply += "✅ **در دسترس:**\n"
+                reply += "\n".join([f"• `{m}`" for m in available[:20]]) + "\n\n"
             if limited:
-                reply += "⚠️ **محدودیت خورده:**\n" + "\n".join([f"• {m}" for m in limited]) + "\n\n"
+                reply += "⚠️ **محدودیت خورده:**\n"
+                reply += "\n".join([f"• `{m}`" for m in limited]) + "\n\n"
             if unavailable:
-                reply += "❌ **در دسترس نیست:**\n" + "\n".join([f"• {m}" for m in unavailable]) + "\n\n"
+                reply += "❌ **در دسترس نیست:**\n"
+                reply += "\n".join([f"• `{m}`" for m in unavailable]) + "\n\n"
             if not available and not limited and not unavailable:
                 reply = "❌ هیچ اطلاعاتی از مدل‌ها در دسترس نیست."
-            keyboard = [[InlineKeyboardButton("🔄 به‌روزرسانی", callback_data="refresh_status")]]
+            
+            keyboard = [
+                [InlineKeyboardButton("🔄 به‌روزرسانی", callback_data="refresh_status")],
+                [InlineKeyboardButton("🏠 بازگشت به منو", callback_data="back_to_menu")]
+            ]
             reply_markup = InlineKeyboardMarkup(keyboard)
+            
             await status_msg.edit_text(reply, parse_mode="Markdown", reply_markup=reply_markup)
         else:
             await status_msg.edit_text(f"❌ خطا در دریافت وضعیت: {response.status_code}")
@@ -101,27 +147,109 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logging.error(f"Error fetching models: {e}")
         await status_msg.edit_text(f"❌ خطا در ارتباط با سرور: {str(e)[:100]}")
 
-async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    if query.data == "refresh_status":
-        await status_command(update, context)
-
+# ===== دستور /clear =====
 async def clear_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     await clear_history(user_id)
-    await update.message.reply_text("🧹 حافظه‌ی مکالمه شما پاک شد.")
+    
+    keyboard = [[InlineKeyboardButton("🏠 بازگشت به منو", callback_data="back_to_menu")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text(
+        "🧹 **حافظه‌ی مکالمه شما با موفقیت پاک شد!**\n\n✨ از این به بعد همه‌چیز را از اول شروع می‌کنیم.",
+        parse_mode="Markdown",
+        reply_markup=reply_markup
+    )
 
+# ===== دستور /help =====
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    help_text = """
+📖 **راهنمای ربات**
+
+🤖 این ربات با استفاده از هوش مصنوعی به سوالات شما پاسخ می‌دهد.
+
+🔹 **نحوه استفاده:**
+• هر سوالی دارید، به‌صورت عادی بپرسید.
+• من تاریخچه‌ی مکالمه را به خاطر می‌سپارم.
+
+🔹 **دستورات:**
+• `/start` – نمایش منوی اصلی
+• `/status` – وضعیت مدل‌های هوش مصنوعی
+• `/clear` – پاک کردن حافظه‌ی مکالمه
+• `/help` – نمایش این راهنما
+
+🔹 **ویژگی‌ها:**
+• انتخاب خودکار بهترین مدل
+• حافظه‌ی دائمی برای هر کاربر
+• پاسخ‌های روان و فارسی
+• **نمایش نام مدل پاسخ‌دهنده در انتهای هر پیام**
+
+💡 فقط سوال خود را بپرسید!
+    """
+    
+    keyboard = [[InlineKeyboardButton("🏠 بازگشت به منو", callback_data="back_to_menu")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text(help_text, parse_mode="Markdown", reply_markup=reply_markup)
+
+# ===== مدیریت دکمه‌ها =====
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    if query.data == "refresh_status":
+        await status_command(update, context)
+    
+    elif query.data == "back_to_menu":
+        keyboard = [
+            [InlineKeyboardButton("📊 وضعیت مدل‌ها", callback_data="status_btn")],
+            [InlineKeyboardButton("🧹 پاک کردن حافظه", callback_data="clear_btn")],
+            [InlineKeyboardButton("📖 راهنما", callback_data="help_btn")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(
+            "🏠 **منوی اصلی**\n\nیک گزینه را انتخاب کنید یا سوال خود را بپرسید:",
+            parse_mode="Markdown",
+            reply_markup=reply_markup
+        )
+    
+    elif query.data == "status_btn":
+        await status_command(update, context)
+    
+    elif query.data == "clear_btn":
+        user_id = str(update.effective_user.id)
+        await clear_history(user_id)
+        
+        keyboard = [[InlineKeyboardButton("🏠 بازگشت به منو", callback_data="back_to_menu")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(
+            "🧹 **حافظه‌ی مکالمه شما با موفقیت پاک شد!**",
+            parse_mode="Markdown",
+            reply_markup=reply_markup
+        )
+    
+    elif query.data == "help_btn":
+        await help_command(update, context)
+
+# ===== تابع اصلی پاسخ‌دهی (با نمایش نام مدل) =====
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     user_message = update.message.text
+    
     if user_message.startswith('/'):
         return
+    
+    # پیام "در حال پردازش..."
+    processing_msg = await update.message.reply_text("🤔 در حال پردازش...")
+    
     history = await get_history(user_id, MAX_HISTORY)
     messages = []
     for role, content in history:
         messages.append({"role": role, "content": content})
     messages.append({"role": "user", "content": user_message})
+    
     headers = {
         "Authorization": f"Bearer {FREELLMAPI_KEY}",
         "Content-Type": "application/json"
@@ -130,38 +258,50 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "model": "auto",
         "messages": messages
     }
+    
     try:
         response = requests.post(FREELLMAPI_URL, headers=headers, json=data, timeout=30)
         response.raise_for_status()
         result = response.json()
+        
         if "choices" in result and len(result["choices"]) > 0:
             ai_reply = result["choices"][0]["message"]["content"]
+            
+            # ===== استخراج نام مدل =====
+            model_used = result.get("model", "نامشخص")
+            
+            # ذخیره در دیتابیس (بدون نام مدل)
             await save_message(user_id, "user", user_message)
             await save_message(user_id, "assistant", ai_reply)
-            await update.message.reply_text(ai_reply)
+            
+            # حذف پیام "در حال پردازش"
+            await processing_msg.delete()
+            
+            # ===== ارسال پاسخ با نام مدل =====
+            reply_with_model = f"{ai_reply}\n\n---\n🤖 **مدل:** `{model_used}`"
+            await update.message.reply_text(reply_with_model, parse_mode="Markdown")
         else:
-            await update.message.reply_text("❌ خطا در دریافت پاسخ از هوش مصنوعی.")
+            await processing_msg.edit_text("❌ خطا در دریافت پاسخ از هوش مصنوعی.")
+            
     except requests.exceptions.RequestException as e:
         logging.error(f"Error: {e}")
-        await update.message.reply_text("⚠️ سرور هوش مصنوعی در دسترس نیست. لطفاً بعداً امتحان کنید.")
+        await processing_msg.edit_text("⚠️ سرور هوش مصنوعی در دسترس نیست. لطفاً بعداً امتحان کنید.")
 
-# ===== تابع اصلی با حلقه‌ی رویداد جداگانه =====
+# ===== تابع اصلی =====
 def main():
-    # مقداردهی اولیه دیتابیس
     asyncio.run(init_db())
     
-    # ساخت اپلیکیشن
     application = Application.builder().token(TELEGRAM_TOKEN).build()
     
     # ثبت هندلرها
+    application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("status", status_command))
     application.add_handler(CommandHandler("clear", clear_command))
+    application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CallbackQueryHandler(button_handler))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
-    print("🤖 ربات با حافظه‌ی دائمی PostgreSQL روشن شد...")
-    
-    # اجرای ربات با Polling (بدون asyncio.run اضافی)
+    print("🤖 ربات با حافظه‌ی دائمی PostgreSQL و نمایش نام مدل روشن شد...")
     application.run_polling()
 
 if __name__ == "__main__":
