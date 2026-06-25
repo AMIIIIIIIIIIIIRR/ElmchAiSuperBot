@@ -2,10 +2,11 @@ import logging
 import requests
 import os
 import asyncpg
+import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, MessageHandler, filters, ContextTypes, CommandHandler, CallbackQueryHandler
 
-# ===== تنظیمات از متغیرهای محیطی =====
+# ===== تنظیمات =====
 TELEGRAM_TOKEN = os.getenv("BOT_TOKEN")
 FREELLMAPI_KEY = os.getenv("FREELLMAPI_KEY")
 FREELLMAPI_URL = os.getenv("FREELLMAPI_URL")
@@ -19,9 +20,8 @@ MAX_HISTORY = 20
 
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
 
-# ===== اتصال به دیتابیس =====
+# ===== دیتابیس =====
 async def init_db():
-    """ایجاد جدول history در دیتابیس (اگر وجود نداشته باشد)"""
     conn = await asyncpg.connect(DATABASE_URL)
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS chat_history (
@@ -71,9 +71,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not models:
                 await status_msg.edit_text("❌ هیچ مدلی در دسترس نیست.")
                 return
-            available = []
-            unavailable = []
-            limited = []
+            available, unavailable, limited = [], [], []
             for model in models:
                 model_id = model.get("id", "نامشخص")
                 status = model.get("status", "unknown")
@@ -147,10 +145,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logging.error(f"Error: {e}")
         await update.message.reply_text("⚠️ سرور هوش مصنوعی در دسترس نیست. لطفاً بعداً امتحان کنید.")
 
-# ===== تابع اصلی =====
-async def main():
+# ===== تابع اصلی با حلقه‌ی رویداد جداگانه =====
+def main():
     # مقداردهی اولیه دیتابیس
-    await init_db()
+    asyncio.run(init_db())
     
     # ساخت اپلیکیشن
     application = Application.builder().token(TELEGRAM_TOKEN).build()
@@ -162,8 +160,9 @@ async def main():
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
     print("🤖 ربات با حافظه‌ی دائمی PostgreSQL روشن شد...")
-    await application.run_polling()
+    
+    # اجرای ربات با Polling (بدون asyncio.run اضافی)
+    application.run_polling()
 
 if __name__ == "__main__":
-    import asyncio
-    asyncio.run(main())
+    main()
