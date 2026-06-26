@@ -96,12 +96,12 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         query = update.callback_query
         await query.answer()
         message = query.message
-        edit_mode = True
+        is_callback = True
     else:
         message = update.message
-        edit_mode = False
+        is_callback = False
     
-    if edit_mode:
+    if is_callback:
         status_msg = await message.edit_text("⏳ در حال دریافت وضعیت مدل‌ها...")
     else:
         status_msg = await message.reply_text("⏳ در حال دریافت وضعیت مدل‌ها...")
@@ -203,7 +203,13 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[InlineKeyboardButton("🏠 بازگشت به منو", callback_data="back_to_menu")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    await update.message.reply_text(help_text, parse_mode="Markdown", reply_markup=reply_markup)
+    # تشخیص اینکه از پیام عادی اومده یا از دکمه
+    if update.callback_query:
+        query = update.callback_query
+        await query.answer()
+        await query.edit_message_text(help_text, parse_mode="Markdown", reply_markup=reply_markup)
+    else:
+        await update.message.reply_text(help_text, parse_mode="Markdown", reply_markup=reply_markup)
 
 # ===== مدیریت دکمه‌ها =====
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -211,7 +217,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     
     if query.data == "refresh_status":
-        # ارسال به status_command با callback_query
         await status_command(update, context)
     
     elif query.data == "back_to_menu":
@@ -301,7 +306,7 @@ def main():
     
     application = Application.builder().token(TELEGRAM_TOKEN).build()
     
-    # ===== تنظیم منوی کامندها (نمایش در کنار ورودی) =====
+    # ===== تنظیم منوی کامندها =====
     commands = [
         BotCommand("start", "نمایش منوی اصلی"),
         BotCommand("status", "وضعیت مدل‌های هوش مصنوعی"),
