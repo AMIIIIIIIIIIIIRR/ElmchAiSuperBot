@@ -320,7 +320,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logging.error(f"Error: {e}")
         await processing_msg.edit_text("⚠️ سرور هوش مصنوعی در دسترس نیست. لطفاً بعداً امتحان کنید.")
 
-# ===== تابع اصلی (با Webhook) =====
+# ===== تابع اصلی (با Webhook و close_loop=False) =====
 async def main():
     await init_db()
     
@@ -357,12 +357,13 @@ async def main():
     # ===== تنظیم Webhook جدید =====
     await application.bot.set_webhook(WEBHOOK_URL)
     
-    # ===== اجرا با Webhook =====
+    # ===== اجرا با Webhook و غیرفعال کردن بسته شدن حلقه =====
     await application.run_webhook(
         listen="0.0.0.0",
         port=PORT,
         url_path="webhook",
-        webhook_url=WEBHOOK_URL
+        webhook_url=WEBHOOK_URL,
+        close_loop=False  # ← این خط اضافه شد
     )
 
 if __name__ == "__main__":
