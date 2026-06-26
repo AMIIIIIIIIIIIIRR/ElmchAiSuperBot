@@ -20,7 +20,7 @@ SHORT_TERM_MEMORY = 5
 
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
 
-# ===== دیتابیس (همه توابع async هستند) =====
+# ===== دیتابیس =====
 async def init_db():
     conn = await asyncpg.connect(DATABASE_URL)
     await conn.execute("""
@@ -93,7 +93,7 @@ async def delete_memory(user_id: str, memory_text: str):
     )
     await conn.close()
 
-# ===== دستورات (همگی async) =====
+# ===== دستورات =====
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_name = update.effective_user.first_name or "کاربر عزیز"
     welcome_text = f"""
@@ -320,17 +320,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ===== تابع اصلی (همگام) =====
 def main():
-    # اجرای تنظیمات دیتابیس با یک حلقه‌ی رویداد جداگانه
-    async def setup_db():
+    # ===== همه‌ی تنظیمات async در یک حلقه‌ی رویداد =====
+    async def setup_all():
+        # دیتابیس
         await init_db()
-    
-    asyncio.run(setup_db())
-    
-    # ساخت اپلیکیشن
-    application = Application.builder().token(TELEGRAM_TOKEN).build()
-    
-    # تنظیم منوی کامندها (با حلقه‌ی رویداد جداگانه)
-    async def setup_commands():
+        
+        # ساختن اپلیکیشن
+        app = Application.builder().token(TELEGRAM_TOKEN).build()
+        
+        # تنظیم کامندها
         commands = [
             BotCommand("start", "نمایش منوی اصلی"),
             BotCommand("remember", "ذخیره یک نکته در حافظه‌ی بلندمدت"),
@@ -341,25 +339,28 @@ def main():
             BotCommand("status", "وضعیت مدل‌های هوش مصنوعی"),
             BotCommand("help", "راهنمای ربات")
         ]
-        await application.bot.set_my_commands(commands)
+        await app.bot.set_my_commands(commands)
+        
+        # ثبت هندلرها
+        app.add_handler(CommandHandler("start", start_command))
+        app.add_handler(CommandHandler("remember", remember_command))
+        app.add_handler(CommandHandler("memories", memories_command))
+        app.add_handler(CommandHandler("forget", forget_command))
+        app.add_handler(CommandHandler("clear_memories", clear_memories_command))
+        app.add_handler(CommandHandler("clear", clear_command))
+        app.add_handler(CommandHandler("status", status_command))
+        app.add_handler(CommandHandler("help", help_command))
+        app.add_handler(CallbackQueryHandler(button_handler))
+        app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+        
+        return app
     
-    asyncio.run(setup_commands())
-    
-    # ثبت هندلرها
-    application.add_handler(CommandHandler("start", start_command))
-    application.add_handler(CommandHandler("remember", remember_command))
-    application.add_handler(CommandHandler("memories", memories_command))
-    application.add_handler(CommandHandler("forget", forget_command))
-    application.add_handler(CommandHandler("clear_memories", clear_memories_command))
-    application.add_handler(CommandHandler("clear", clear_command))
-    application.add_handler(CommandHandler("status", status_command))
-    application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(CallbackQueryHandler(button_handler))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    # ===== اجرای تنظیمات و گرفتن اپلیکیشن =====
+    application = asyncio.run(setup_all())
     
     print("🤖 ربات با حافظه‌ی ترکیبی (۵ پیام + یادداشت‌ها) روشن شد...")
     
-    # اجرای ربات با Polling (خودش حلقه‌ی رویداد را مدیریت می‌کند)
+    # ===== اجرای ربات با Polling (خارج از حلقه‌ی asyncio) =====
     application.run_polling()
 
 if __name__ == "__main__":
