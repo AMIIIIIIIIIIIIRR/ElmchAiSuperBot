@@ -12,7 +12,7 @@ FREELLMAPI_KEY = os.getenv("FREELLMAPI_KEY")
 FREELLMAPI_URL = os.getenv("FREELLMAPI_URL")
 DATABASE_URL = os.getenv("DATABASE_URL")
 PORT = int(os.getenv("PORT", 8443))
-WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # باید در Railway تنظیم شود
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 
 if not all([TELEGRAM_TOKEN, FREELLMAPI_KEY, FREELLMAPI_URL, DATABASE_URL, WEBHOOK_URL]):
     raise ValueError("BOT_TOKEN, FREELLMAPI_KEY, FREELLMAPI_URL, DATABASE_URL and WEBHOOK_URL must be set")
@@ -320,7 +320,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logging.error(f"Error: {e}")
         await processing_msg.edit_text("⚠️ سرور هوش مصنوعی در دسترس نیست. لطفاً بعداً امتحان کنید.")
 
-# ===== تابع اصلی (با Webhook و close_loop=False) =====
+# ===== تابع اصلی =====
 async def main():
     await init_db()
     
@@ -351,20 +351,18 @@ async def main():
     
     print("🤖 ربات با حافظه‌ی ترکیبی (۵ پیام + یادداشت‌ها) روشن شد...")
     
-    # ===== حذف Webhook قبلی (در صورت وجود) =====
     await application.bot.delete_webhook()
-    
-    # ===== تنظیم Webhook جدید =====
     await application.bot.set_webhook(WEBHOOK_URL)
     
-    # ===== اجرا با Webhook و غیرفعال کردن بسته شدن حلقه =====
     await application.run_webhook(
         listen="0.0.0.0",
         port=PORT,
         url_path="webhook",
         webhook_url=WEBHOOK_URL,
-        close_loop=False  # ← این خط اضافه شد
+        close_loop=False
     )
 
+# ===== اجرا با loop.run_until_complete (نه asyncio.run) =====
 if __name__ == "__main__":
-    asyncio.run(main())
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(main())
