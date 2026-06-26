@@ -3,7 +3,7 @@ import requests
 import os
 import asyncpg
 import asyncio
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
 from telegram.ext import Application, MessageHandler, filters, ContextTypes, CommandHandler, CallbackQueryHandler
 
 # ===== تنظیمات =====
@@ -91,7 +91,20 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ===== دستور /status =====
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    status_msg = await update.message.reply_text("⏳ در حال دریافت وضعیت مدل‌ها...")
+    # تشخیص اینکه از پیام عادی اومده یا از دکمه
+    if update.callback_query:
+        query = update.callback_query
+        await query.answer()
+        message = query.message
+        edit_mode = True
+    else:
+        message = update.message
+        edit_mode = False
+    
+    if edit_mode:
+        status_msg = await message.edit_text("⏳ در حال دریافت وضعیت مدل‌ها...")
+    else:
+        status_msg = await message.reply_text("⏳ در حال دریافت وضعیت مدل‌ها...")
     
     try:
         response = requests.get(
@@ -198,6 +211,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     
     if query.data == "refresh_status":
+        # ارسال به status_command با callback_query
         await status_command(update, context)
     
     elif query.data == "back_to_menu":
@@ -233,7 +247,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif query.data == "help_btn":
         await help_command(update, context)
 
-# ===== تابع اصلی پاسخ‌دهی (با نمایش نام مدل) =====
+# ===== تابع اصلی پاسخ‌دهی =====
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     user_message = update.message.text
@@ -241,7 +255,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_message.startswith('/'):
         return
     
-    # پیام "در حال پردازش..."
     processing_msg = await update.message.reply_text("🤔 در حال پردازش...")
     
     history = await get_history(user_id, MAX_HISTORY)
@@ -266,18 +279,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         if "choices" in result and len(result["choices"]) > 0:
             ai_reply = result["choices"][0]["message"]["content"]
-            
-            # ===== استخراج نام مدل =====
             model_used = result.get("model", "نامشخص")
             
-            # ذخیره در دیتابیس (بدون نام مدل)
             await save_message(user_id, "user", user_message)
             await save_message(user_id, "assistant", ai_reply)
             
-            # حذف پیام "در حال پردازش"
             await processing_msg.delete()
             
-            # ===== ارسال پاسخ با نام مدل =====
             reply_with_model = f"{ai_reply}\n\n---\n🤖 **مدل:** `{model_used}`"
             await update.message.reply_text(reply_with_model, parse_mode="Markdown")
         else:
@@ -293,6 +301,15 @@ def main():
     
     application = Application.builder().token(TELEGRAM_TOKEN).build()
     
+    # ===== تنظیم منوی کامندها (نمایش در کنار ورودی) =====
+    commands = [
+        BotCommand("start", "نمایش منوی اصلی"),
+        BotCommand("status", "وضعیت مدل‌های هوش مصنوعی"),
+        BotCommand("clear", "پاک کردن حافظه‌ی مکالمه"),
+        BotCommand("help", "راهنمای ربات")
+    ]
+    application.bot.set_my_commands(commands)
+    
     # ثبت هندلرها
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("status", status_command))
@@ -301,7 +318,7 @@ def main():
     application.add_handler(CallbackQueryHandler(button_handler))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
-    print("🤖 ربات با حافظه‌ی دائمی PostgreSQL و نمایش نام مدل روشن شد...")
+    print("🤖 ربات با منوی کامندها و دکمه‌های اصلاح‌شده روشن شد...")
     application.run_polling()
 
 if __name__ == "__main__":
