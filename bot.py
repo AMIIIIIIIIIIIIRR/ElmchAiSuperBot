@@ -20,7 +20,7 @@ SHORT_TERM_MEMORY = 5
 
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
 
-# ===== دیتابیس =====
+# ===== دیتابیس (همه توابع async هستند) =====
 async def init_db():
     conn = await asyncpg.connect(DATABASE_URL)
     await conn.execute("""
@@ -93,15 +93,15 @@ async def delete_memory(user_id: str, memory_text: str):
     )
     await conn.close()
 
-# ===== دستورات =====
+# ===== دستورات (همگی async) =====
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_name = update.effective_user.first_name or "کاربر عزیز"
     welcome_text = f"""
 🌟 **به ربات هوشمند خوش آمدید، {user_name}!** 🌟
 
 🧠 **سیستم حافظه‌ی هوشمند:**
-• 📝 **حافظه‌ی کوتاه‌مدت**: ۵ پیام آخر را برای بافت مکالمه نگه می‌دارم
-• 💾 **حافظه‌ی بلندمدت**: اطلاعات مهم را با دستورات زیر ذخیره می‌کنم
+• 📝 **حافظه‌ی کوتاه‌مدت**: ۵ پیام آخر برای بافت مکالمه
+• 💾 **حافظه‌ی بلندمدت**: ذخیره اطلاعات مهم با دستورات
 
 📌 **دستورات حافظه:**
 • `/remember [متن]` – ذخیره در حافظه‌ی بلندمدت
@@ -292,8 +292,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 🔹 **قوانین:**
 1. همیشه به فارسی پاسخ دهید.
 2. از یادداشت‌های کاربر در پاسخ‌های خود استفاده کنید.
-3. اگر کاربر سوالی درباره‌ی اطلاعات شخصی خود پرسید، از یادداشت‌ها استفاده کنید.
-4. پاسخ‌ها باید روان، ادبی و مفید باشند.
+3. پاسخ‌ها باید روان، ادبی و مفید باشند.
 """
     messages = [{"role": "system", "content": system_prompt}]
     for role, content in history:
@@ -321,10 +320,17 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ===== تابع اصلی (همگام) =====
 def main():
-    # ===== اجرای تنظیمات ناهمگام در یک حلقه‌ی مجزا =====
-    async def setup():
+    # اجرای تنظیمات دیتابیس با یک حلقه‌ی رویداد جداگانه
+    async def setup_db():
         await init_db()
-        application = Application.builder().token(TELEGRAM_TOKEN).build()
+    
+    asyncio.run(setup_db())
+    
+    # ساخت اپلیکیشن
+    application = Application.builder().token(TELEGRAM_TOKEN).build()
+    
+    # تنظیم منوی کامندها (با حلقه‌ی رویداد جداگانه)
+    async def setup_commands():
         commands = [
             BotCommand("start", "نمایش منوی اصلی"),
             BotCommand("remember", "ذخیره یک نکته در حافظه‌ی بلندمدت"),
@@ -336,21 +342,24 @@ def main():
             BotCommand("help", "راهنمای ربات")
         ]
         await application.bot.set_my_commands(commands)
-        # ثبت هندلرها
-        application.add_handler(CommandHandler("start", start_command))
-        application.add_handler(CommandHandler("remember", remember_command))
-        application.add_handler(CommandHandler("memories", memories_command))
-        application.add_handler(CommandHandler("forget", forget_command))
-        application.add_handler(CommandHandler("clear_memories", clear_memories_command))
-        application.add_handler(CommandHandler("clear", clear_command))
-        application.add_handler(CommandHandler("status", status_command))
-        application.add_handler(CommandHandler("help", help_command))
-        application.add_handler(CallbackQueryHandler(button_handler))
-        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-        return application
-
-    application = asyncio.run(setup())
+    
+    asyncio.run(setup_commands())
+    
+    # ثبت هندلرها
+    application.add_handler(CommandHandler("start", start_command))
+    application.add_handler(CommandHandler("remember", remember_command))
+    application.add_handler(CommandHandler("memories", memories_command))
+    application.add_handler(CommandHandler("forget", forget_command))
+    application.add_handler(CommandHandler("clear_memories", clear_memories_command))
+    application.add_handler(CommandHandler("clear", clear_command))
+    application.add_handler(CommandHandler("status", status_command))
+    application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CallbackQueryHandler(button_handler))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    
     print("🤖 ربات با حافظه‌ی ترکیبی (۵ پیام + یادداشت‌ها) روشن شد...")
+    
+    # اجرای ربات با Polling (خودش حلقه‌ی رویداد را مدیریت می‌کند)
     application.run_polling()
 
 if __name__ == "__main__":
