@@ -348,7 +348,10 @@ async def main():
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
     print("🤖 ربات با حافظه‌ی ترکیبی (۵ پیام + یادداشت‌ها) روشن شد...")
-    await application.run_polling()
+    
+    # ===== راه‌اندازی Polling با تنظیمات پایدار =====
+    # close_loop=False باعث می‌شود حلقه پس از پایان بسته نشود
+    await application.run_polling(close_loop=False)
 
 if __name__ == "__main__":
     asyncio.run(main())
