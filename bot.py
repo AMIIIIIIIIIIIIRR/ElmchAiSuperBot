@@ -318,50 +318,37 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logging.error(f"Error: {e}")
         await processing_msg.edit_text("⚠️ سرور هوش مصنوعی در دسترس نیست. لطفاً بعداً امتحان کنید.")
 
-# ===== تابع اصلی (همگام) =====
-def main():
-    # ===== همه‌ی تنظیمات async در یک حلقه‌ی رویداد =====
-    async def setup_all():
-        # دیتابیس
-        await init_db()
-        
-        # ساختن اپلیکیشن
-        app = Application.builder().token(TELEGRAM_TOKEN).build()
-        
-        # تنظیم کامندها
-        commands = [
-            BotCommand("start", "نمایش منوی اصلی"),
-            BotCommand("remember", "ذخیره یک نکته در حافظه‌ی بلندمدت"),
-            BotCommand("memories", "نمایش یادداشت‌های ذخیره‌شده"),
-            BotCommand("forget", "حذف یک یادداشت"),
-            BotCommand("clear_memories", "پاک کردن همه‌ی یادداشت‌ها"),
-            BotCommand("clear", "پاک کردن حافظه‌ی کوتاه‌مدت"),
-            BotCommand("status", "وضعیت مدل‌های هوش مصنوعی"),
-            BotCommand("help", "راهنمای ربات")
-        ]
-        await app.bot.set_my_commands(commands)
-        
-        # ثبت هندلرها
-        app.add_handler(CommandHandler("start", start_command))
-        app.add_handler(CommandHandler("remember", remember_command))
-        app.add_handler(CommandHandler("memories", memories_command))
-        app.add_handler(CommandHandler("forget", forget_command))
-        app.add_handler(CommandHandler("clear_memories", clear_memories_command))
-        app.add_handler(CommandHandler("clear", clear_command))
-        app.add_handler(CommandHandler("status", status_command))
-        app.add_handler(CommandHandler("help", help_command))
-        app.add_handler(CallbackQueryHandler(button_handler))
-        app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-        
-        return app
+# ===== تابع اصلی =====
+async def main():
+    await init_db()
     
-    # ===== اجرای تنظیمات و گرفتن اپلیکیشن =====
-    application = asyncio.run(setup_all())
+    application = Application.builder().token(TELEGRAM_TOKEN).build()
+    
+    commands = [
+        BotCommand("start", "نمایش منوی اصلی"),
+        BotCommand("remember", "ذخیره یک نکته در حافظه‌ی بلندمدت"),
+        BotCommand("memories", "نمایش یادداشت‌های ذخیره‌شده"),
+        BotCommand("forget", "حذف یک یادداشت"),
+        BotCommand("clear_memories", "پاک کردن همه‌ی یادداشت‌ها"),
+        BotCommand("clear", "پاک کردن حافظه‌ی کوتاه‌مدت"),
+        BotCommand("status", "وضعیت مدل‌های هوش مصنوعی"),
+        BotCommand("help", "راهنمای ربات")
+    ]
+    await application.bot.set_my_commands(commands)
+    
+    application.add_handler(CommandHandler("start", start_command))
+    application.add_handler(CommandHandler("remember", remember_command))
+    application.add_handler(CommandHandler("memories", memories_command))
+    application.add_handler(CommandHandler("forget", forget_command))
+    application.add_handler(CommandHandler("clear_memories", clear_memories_command))
+    application.add_handler(CommandHandler("clear", clear_command))
+    application.add_handler(CommandHandler("status", status_command))
+    application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CallbackQueryHandler(button_handler))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
     print("🤖 ربات با حافظه‌ی ترکیبی (۵ پیام + یادداشت‌ها) روشن شد...")
-    
-    # ===== اجرای ربات با Polling (خارج از حلقه‌ی asyncio) =====
-    application.run_polling()
+    await application.run_polling()
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
