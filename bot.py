@@ -11,9 +11,11 @@ TELEGRAM_TOKEN = os.getenv("BOT_TOKEN")
 FREELLMAPI_KEY = os.getenv("FREELLMAPI_KEY")
 FREELLMAPI_URL = os.getenv("FREELLMAPI_URL")
 DATABASE_URL = os.getenv("DATABASE_URL")
+PORT = int(os.getenv("PORT", 8443))
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # باید در Railway تنظیم شود
 
-if not all([TELEGRAM_TOKEN, FREELLMAPI_KEY, FREELLMAPI_URL, DATABASE_URL]):
-    raise ValueError("BOT_TOKEN, FREELLMAPI_KEY, FREELLMAPI_URL and DATABASE_URL must be set")
+if not all([TELEGRAM_TOKEN, FREELLMAPI_KEY, FREELLMAPI_URL, DATABASE_URL, WEBHOOK_URL]):
+    raise ValueError("BOT_TOKEN, FREELLMAPI_KEY, FREELLMAPI_URL, DATABASE_URL and WEBHOOK_URL must be set")
 
 BASE_URL = FREELLMAPI_URL.replace("/v1/chat/completions", "")
 SHORT_TERM_MEMORY = 5
@@ -318,7 +320,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logging.error(f"Error: {e}")
         await processing_msg.edit_text("⚠️ سرور هوش مصنوعی در دسترس نیست. لطفاً بعداً امتحان کنید.")
 
-# ===== تابع اصلی =====
+# ===== تابع اصلی (با Webhook) =====
 async def main():
     await init_db()
     
@@ -349,9 +351,19 @@ async def main():
     
     print("🤖 ربات با حافظه‌ی ترکیبی (۵ پیام + یادداشت‌ها) روشن شد...")
     
-    # ===== راه‌اندازی Polling با تنظیمات پایدار =====
-    # close_loop=False باعث می‌شود حلقه پس از پایان بسته نشود
-    await application.run_polling(close_loop=False)
+    # ===== حذف Webhook قبلی (در صورت وجود) =====
+    await application.bot.delete_webhook()
+    
+    # ===== تنظیم Webhook جدید =====
+    await application.bot.set_webhook(WEBHOOK_URL)
+    
+    # ===== اجرا با Webhook =====
+    await application.run_webhook(
+        listen="0.0.0.0",
+        port=PORT,
+        url_path="webhook",
+        webhook_url=WEBHOOK_URL
+    )
 
 if __name__ == "__main__":
     asyncio.run(main())
