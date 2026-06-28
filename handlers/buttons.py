@@ -1,10 +1,15 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
-from handlers.base import show_main_menu
-from handlers.memory import show_memory_menu, memory_save, memory_view, memory_delete, memory_delete_confirm, memory_clear, memory_clear_confirm
-from handlers.reminder import show_reminder_menu, reminder_set, reminder_list, reminder_cancel, reminder_cancel_confirm
+from handlers.base import show_main_menu, help_command
+from handlers.memory import (
+    show_memory_menu, memory_save, memory_view, memory_delete,
+    memory_delete_confirm, memory_clear, memory_clear_confirm
+)
+from handlers.reminder import (
+    show_reminder_menu, reminder_new, reminder_list,
+    reminder_cancel, reminder_cancel_confirm, calendar_handler
+)
 from handlers.ai import status_command
-from handlers.base import help_command  # یا همان show_main_menu
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -38,14 +43,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await status_command(update, context)
 
     elif data == "menu_help":
-        # می‌توانید یک help ساده نمایش دهید یا همان منوی اصلی
-        await query.edit_message_text(
-            "❓ **راهنما**\n\n"
-            "برای شروع از دکمه‌های منو استفاده کنید.\n"
-            "هر بخش توضیحات مخصوص خود را دارد.\n"
-            "همیشه می‌توانید با دکمه‌ی 🔙 به منوی اصلی بازگردید.",
-            parse_mode="Markdown"
-        )
+        await help_command(update, context)
 
     # ===== منوی حافظه =====
     elif data == "memory_save":
@@ -62,16 +60,13 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await memory_clear_confirm(update, context)
 
     # ===== منوی یادآوری =====
-    elif data == "reminder_set":
-        await reminder_set(update, context)
+    elif data == "reminder_new":  # ← تغییر از reminder_set به reminder_new
+        await reminder_new(update, context)
     elif data == "reminder_list":
         await reminder_list(update, context)
     elif data == "reminder_cancel":
         await reminder_cancel(update, context)
     elif data.startswith("cancel_rem_"):
         await reminder_cancel_confirm(update, context)
-        # در handlers/buttons.py، در بخش منوی یادآوری اضافه کنید:
-    elif data == "reminder_new":
-        await reminder_new(update, context)
-    elif data.startswith("cal_"):
+    elif data.startswith("cal_"):  # ← دکمه‌های تقویم
         await calendar_handler(update, context)
