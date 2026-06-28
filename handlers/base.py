@@ -8,6 +8,7 @@ MAIN_MENU = [
     [InlineKeyboardButton("🎭 شخصیت", callback_data="menu_personality")],
     [InlineKeyboardButton("🧠 حافظه", callback_data="menu_memory")],
     [InlineKeyboardButton("⏰ یادآوری", callback_data="menu_reminder")],
+    [InlineKeyboardButton("🌐 جستجوی اینترنت", callback_data="menu_websearch")],  # ← اضافه شد
     [InlineKeyboardButton("📊 وضعیت مدل‌ها", callback_data="menu_status")],
     [InlineKeyboardButton("❓ راهنما", callback_data="menu_help")],
 ]
@@ -28,6 +29,7 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, edi
 | 🎭 **شخصیت** | لحن ربات را عوض کن (ادبی، کول، رکیک ۱۸+، جدی) |
 | 🧠 **حافظه** | نکات مهم را ذخیره و بازیابی کنید |
 | ⏰ **یادآوری** | یادآوری‌ها را تنظیم کنید |
+| 🌐 **جستجوی اینترنت** | روشن/خاموش کردن جستجوی خودکار اینترنت |
 | 📊 **وضعیت** | وضعیت مدل‌های هوش مصنوعی را ببینید |
 
 ---
