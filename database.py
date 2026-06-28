@@ -113,7 +113,10 @@ async def save_reminder(user_id: str, chat_id: str, message: str, remind_at, job
             user_id, chat_id, message, remind_at, job_id
         )
 
-async def get_reminders(user_id: str):
+# ===== توابع مورد نیاز reminder.py (با نام‌های دقیق) =====
+
+async def get_user_reminders(user_id: str):
+    """همان get_reminders با نام متفاوت برای سازگاری با reminder.py"""
     async with db_pool.acquire() as conn:
         return await conn.fetch(
             "SELECT id, message, remind_at, job_id FROM reminders "
@@ -121,9 +124,23 @@ async def get_reminders(user_id: str):
             user_id,
         )
 
-async def delete_reminder(reminder_id: int):
+async def get_reminder_by_id(reminder_id: int, user_id: str):
+    """دریافت یک یادآوری خاص با id و user_id"""
+    async with db_pool.acquire() as conn:
+        return await conn.fetchrow(
+            "SELECT * FROM reminders WHERE id = $1 AND user_id = $2",
+            reminder_id, user_id
+        )
+
+async def delete_reminder(reminder_id: int, user_id: str = None):
+    """حذف یادآوری با id (user_id فقط برای سازگاری با reminder.py استفاده می‌شود)"""
     async with db_pool.acquire() as conn:
         await conn.execute("DELETE FROM reminders WHERE id = $1", reminder_id)
+
+# ===== تابع قبلی (برای استفاده در جاهای دیگر) =====
+async def get_reminders(user_id: str):
+    """همان get_user_reminders با نام متفاوت (برای جاهایی که از این اسم استفاده می‌کنند)"""
+    return await get_user_reminders(user_id)
 
 async def get_all_pending_reminders():
     """همه‌ی یادآوری‌های ذخیره‌شده در DB را برمی‌گرداند تا پس از ری‌استارت دوباره شِدول شوند."""
