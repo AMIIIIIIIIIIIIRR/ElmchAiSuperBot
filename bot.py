@@ -1,12 +1,17 @@
 import logging
-from telegram import Update  # ← این خط را اضافه کنید
+from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler
 from config import TELEGRAM_TOKEN
 from database import init_db, close_db
 from handlers.base import start_command, help_command
 from handlers.memory import (
-    remember_command, memories_command, forget_command,
-    clear_memories_command, clear_history_command
+    show_memory_menu, memory_save, memory_view, memory_delete,
+    memory_delete_confirm, memory_clear, memory_clear_confirm,
+    handle_memory_text
+)
+from handlers.reminder import (
+    show_reminder_menu, reminder_set, reminder_list,
+    reminder_cancel, reminder_cancel_confirm, handle_reminder_text
 )
 from handlers.ai import handle_message, status_command
 from handlers.buttons import button_handler
@@ -17,13 +22,7 @@ async def post_init(application):
     await init_db()
     commands = [
         ("start", "نمایش منوی اصلی"),
-        ("remember", "ذخیره یک نکته در حافظه‌ی بلندمدت"),
-        ("memories", "نمایش یادداشت‌های ذخیره‌شده"),
-        ("forget", "حذف یک یادداشت"),
-        ("clear_memories", "پاک کردن همه‌ی یادداشت‌ها"),
-        ("clear", "پاک کردن حافظه‌ی کوتاه‌مدت"),
-        ("status", "وضعیت مدل‌های هوش مصنوعی"),
-        ("help", "راهنمای ربات"),
+        ("help", "راهنما"),
     ]
     await application.bot.set_my_commands(commands)
 
@@ -36,18 +35,26 @@ def main():
         .build()
     )
 
+    # ===== ثبت هندلرهای دستوری =====
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(CommandHandler("remember", remember_command))
-    application.add_handler(CommandHandler("memories", memories_command))
-    application.add_handler(CommandHandler("forget", forget_command))
-    application.add_handler(CommandHandler("clear_memories", clear_memories_command))
-    application.add_handler(CommandHandler("clear", clear_history_command))
-    application.add_handler(CommandHandler("status", status_command))
+    
+    # ===== ثبت هندلر دکمه‌های اینلاین =====
     application.add_handler(CallbackQueryHandler(button_handler))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    
+    # ===== هندلر پیام‌های متنی با تشخیص وضعیت =====
+    async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        waiting_for = context.user_data.get("waiting_for")
+        if waiting_for == "reminder_text":
+            await handle_reminder_text(update, context)
+        elif waiting_for == "memory_text":
+            await handle_memory_text(update, context)
+        else:
+            await handle_message(update, context)
+    
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler))
 
-    print("🤖 ربات با ساختار ماژولار روشن شد...")
+    print("🤖 ربات با ساختار ماژولار و منوی کامل روشن شد...")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
