@@ -35,6 +35,16 @@ async def init_db():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        # ===== جدول جدید: تنظیمات کاربر (شخصیت انتخاب‌شده) =====
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS user_settings (
+                user_id TEXT PRIMARY KEY,
+                personality TEXT NOT NULL DEFAULT 'default',
+                nsfw_accepted BOOLEAN NOT NULL DEFAULT FALSE,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
         await conn.execute("CREATE INDEX IF NOT EXISTS idx_chat_history_user_id ON chat_history(user_id)")
         await conn.execute("CREATE INDEX IF NOT EXISTS idx_user_memories_user_id ON user_memories(user_id)")
         await conn.execute("CREATE INDEX IF NOT EXISTS idx_reminders_user_id ON reminders(user_id)")
@@ -103,37 +113,64 @@ async def save_reminder(user_id: str, chat_id: str, message: str, remind_at, job
             user_id, chat_id, message, remind_at, job_id
         )
 
-async def get_user_reminders(user_id: str):
+async def get_reminders(user_id: str):
     async with db_pool.acquire() as conn:
-        rows = await conn.fetch(
-            "SELECT id, message, remind_at, job_id FROM reminders WHERE user_id = $1 ORDER BY remind_at ASC",
-            user_id
+        return await conn.fetch(
+            "SELECT id, message, remind_at, job_id FROM reminders "
+            "WHERE user_id = $1 ORDER BY remind_at ASC",
+            user_id,
         )
-    return rows
+
+async def delete_reminder(reminder_id: int):
+    async with db_pool.acquire() as conn:
+        await conn.execute("DELETE FROM reminders WHERE id = $1", reminder_id)
 
 async def get_all_pending_reminders():
-    """همه‌ی یادآوری‌های ذخیره‌شده — برای reschedule هنگام استارت."""
+    """همه‌ی یادآوری‌های ذخیره‌شده در DB را برمی‌گرداند تا پس از ری‌استارت دوباره شِدول شوند."""
     async with db_pool.acquire() as conn:
-        rows = await conn.fetch(
-            "SELECT id, user_id, chat_id, message, remind_at, job_id "
-            "FROM reminders ORDER BY remind_at ASC"
+        return await conn.fetch(
+            "SELECT id, user_id, chat_id, message, remind_at, job_id FROM reminders"
         )
-    return rows
 
-async def delete_reminder(reminder_id: int, user_id: str):
+# ===== تنظیمات کاربر (شخصیت) =====
+async def get_user_personality(user_id: str) -> str:
+    """شخصیت فعلی کاربر را برمی‌گرداند؛ اگر چیزی ذخیره نشده باشد، 'default'."""
+    async with db_pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT personality FROM user_settings WHERE user_id = $1", user_id
+        )
+    return row["personality"] if row else "default"
+
+async def set_user_personality(user_id: str, personality: str):
+    """شخصیت کاربر را ذخیره/به‌روزرسانی می‌کند."""
     async with db_pool.acquire() as conn:
         await conn.execute(
-            "DELETE FROM reminders WHERE id = $1 AND user_id = $2",
-            reminder_id, user_id
+            """
+            INSERT INTO user_settings (user_id, personality, updated_at)
+            VALUES ($1, $2, CURRENT_TIMESTAMP)
+            ON CONFLICT (user_id)
+            DO UPDATE SET personality = EXCLUDED.personality,
+                          updated_at = CURRENT_TIMESTAMP
+            """,
+            user_id, personality,
         )
 
-async def get_reminder_by_id(reminder_id: int, user_id: str):
+async def get_nsfw_accepted(user_id: str) -> bool:
     async with db_pool.acquire() as conn:
-        return await conn.fetchrow(
-            "SELECT * FROM reminders WHERE id = $1 AND user_id = $2",
-            reminder_id, user_id
+        row = await conn.fetchrow(
+            "SELECT nsfw_accepted FROM user_settings WHERE user_id = $1", user_id
         )
+    return bool(row["nsfw_accepted"]) if row else False
 
-async def delete_reminder_by_job_id(job_id: str):
+async def set_nsfw_accepted(user_id: str, accepted: bool):
     async with db_pool.acquire() as conn:
-        await conn.execute("DELETE FROM reminders WHERE job_id = $1", job_id)
+        await conn.execute(
+            """
+            INSERT INTO user_settings (user_id, nsfw_accepted, updated_at)
+            VALUES ($1, $2, CURRENT_TIMESTAMP)
+            ON CONFLICT (user_id)
+            DO UPDATE SET nsfw_accepted = EXCLUDED.nsfw_accepted,
+                          updated_at = CURRENT_TIMESTAMP
+            """,
+            user_id, accepted,
+        )
