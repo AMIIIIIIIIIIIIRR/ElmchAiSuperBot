@@ -21,6 +21,7 @@ from handlers.reminder import (
 from handlers.ai import handle_message, status_command
 from handlers.buttons import button_handler
 from handlers.personality import personality_command
+from handlers.websearch import websearch_command  # ← اضافه شد
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -69,6 +70,7 @@ async def post_init(application: Application):
         ("help", "راهنما"),
         ("personality", "تغییر شخصیت ربات"),
         ("cancel", "لغو عملیات جاری"),
+        ("websearch", "روشن/خاموش جستجوی اینترنت"),  # ← اضافه شد
     ]
     await application.bot.set_my_commands(commands)
     await reschedule_pending_reminders(application)
@@ -99,6 +101,7 @@ def main():
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("cancel", cancel_command))
     application.add_handler(CommandHandler("personality", personality_command))
+    application.add_handler(CommandHandler("websearch", websearch_command))  # ← اضافه شد
     application.add_handler(CallbackQueryHandler(button_handler))
 
     async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -112,7 +115,7 @@ def main():
 
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler))
 
-    print("🤖 ربات با سیستم شخصیت‌ها روشن شد...")
+    print("🤖 ربات با سیستم شخصیت‌ها و جستجوی اینترنت روشن شد...")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
