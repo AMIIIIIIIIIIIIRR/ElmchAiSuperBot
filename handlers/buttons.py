@@ -1,4 +1,4 @@
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update
 from telegram.ext import ContextTypes
 from handlers.base import show_main_menu, help_command
 from handlers.memory import (
@@ -10,6 +10,10 @@ from handlers.reminder import (
     reminder_cancel, reminder_cancel_confirm, calendar_handler
 )
 from handlers.ai import status_command
+from handlers.personality import (
+    show_personality_menu, personality_set, personality_nsfw_confirm,
+)
+
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -45,6 +49,16 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "menu_help":
         await help_command(update, context)
 
+    # ===== منوی شخصیت =====
+    elif data == "menu_personality":
+        await show_personality_menu(update, context, edit=True)
+    elif data.startswith("pers_nsfw_yes_"):
+        key = data[len("pers_nsfw_yes_"):]
+        await personality_nsfw_confirm(update, context, key)
+    elif data.startswith("pers_set_"):
+        key = data[len("pers_set_"):]
+        await personality_set(update, context, key)
+
     # ===== منوی حافظه =====
     elif data == "memory_save":
         await memory_save(update, context)
@@ -68,7 +82,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await reminder_cancel(update, context)
     elif data.startswith("cancel_rem_"):
         await reminder_cancel_confirm(update, context)
-    elif data.startswith("rem_"):  # دکمه‌های تقویم (سال، ماه، روز، ساعت، دقیقه)
+    elif data.startswith("rem_"):
         await calendar_handler(update, context)
-    elif data.startswith("cal_"):  # برای سازگاری با نسخه‌های قبلی
+    elif data.startswith("cal_"):
         await calendar_handler(update, context)
+
+    elif data == "refresh_status":
+        await status_command(update, context)
