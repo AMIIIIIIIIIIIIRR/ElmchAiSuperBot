@@ -70,3 +70,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await reminder_cancel(update, context)
     elif data.startswith("cancel_rem_"):
         await reminder_cancel_confirm(update, context)
+        # در handlers/buttons.py، در بخش منوی یادآوری اضافه کنید:
+    elif data == "reminder_new":
+        await reminder_new(update, context)
+    elif data.startswith("cal_"):
+        await calendar_handler(update, context)
