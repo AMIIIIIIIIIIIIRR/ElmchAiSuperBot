@@ -60,7 +60,6 @@ def format_jalali_datetime(year, month, day, hour, minute):
     return f"{day} {month_names[month-1]} {year} - {hour:02d}:{minute:02d}"
 
 def is_future_date(year, month, day, hour=0, minute=0):
-    """بررسی اینکه تاریخ انتخاب‌شده از زمان فعلی آینده باشد"""
     try:
         jalali_date = jdatetime.date(year, month, day)
         gregorian_date = jalali_date.togregorian()
@@ -76,7 +75,6 @@ async def reminder_new(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     current_year, _, _, _, _ = get_current_jalali()
     
-    # سال‌های از سال جاری به بعد (حداکثر ۱۴۱۵)
     start_year = current_year
     end_year = min(current_year + 10, 1415)
     
@@ -91,7 +89,6 @@ async def show_year_selection(update: Update, context: ContextTypes.DEFAULT_TYPE
     current_year, _, _, _, _ = get_current_jalali()
     start_year = context.user_data["reminder_data"].get("year_range_start", current_year)
     
-    # فقط سال‌های >= سال جاری را نمایش بده
     years = list(range(start_year, min(start_year + 10, 1416)))
     years = [y for y in years if y >= current_year]
     
@@ -102,7 +99,7 @@ async def show_year_selection(update: Update, context: ContextTypes.DEFAULT_TYPE
     for year in years:
         label = str(year)
         if year == current_year:
-            label += " ✅"  # سال جاری
+            label += " ✅"
         buttons.append(InlineKeyboardButton(label, callback_data=f"rem_year_{year}"))
     
     nav_buttons = []
@@ -138,11 +135,10 @@ async def show_month_selection(update: Update, context: ContextTypes.DEFAULT_TYP
     current_year, current_month, _, _, _ = get_current_jalali()
     selected_year = context.user_data["reminder_data"].get("year", current_year)
     
-    # اگر سال انتخاب‌شده سال جاری است، ماه‌های قبل را غیرفعال کن
     buttons = []
     for i, name in enumerate(month_names, 1):
         if selected_year == current_year and i < current_month:
-            label = f"{name} ❌"  # ماه گذشته
+            label = f"{name} ❌"
             callback = "noop"
         else:
             label = name
@@ -177,7 +173,6 @@ async def show_day_selection(update: Update, context: ContextTypes.DEFAULT_TYPE,
     
     buttons = []
     for day in range(1, max_day + 1):
-        # اگر سال و ماه جاری است، روزهای گذشته را غیرفعال کن
         if year == current_year and month == current_month and day < current_day:
             label = f"{day} ❌"
             callback = "noop"
@@ -214,7 +209,6 @@ async def show_hour_selection(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     buttons = []
     for hour in range(0, 24):
-        # اگر تاریخ انتخاب‌شده امروز است، ساعت‌های گذشته را غیرفعال کن
         if year == current_year and month == current_month and day == current_day and hour < current_hour:
             label = f"{hour:02d} ❌"
             callback = "noop"
@@ -252,7 +246,6 @@ async def show_minute_selection(update: Update, context: ContextTypes.DEFAULT_TY
     
     buttons = []
     for minute in range(0, 60, 5):
-        # اگر تاریخ و ساعت امروز است، دقیقه‌های گذشته را غیرفعال کن
         if (year == current_year and month == current_month and day == current_day and 
             hour == current_hour and minute < current_minute):
             label = f"{minute:02d} ❌"
@@ -288,7 +281,6 @@ async def show_confirmation(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     hour = data["hour"]
     minute = data["minute"]
     
-    # بررسی نهایی اینکه تاریخ آینده باشد
     if not is_future_date(year, month, day, hour, minute):
         keyboard = [[InlineKeyboardButton("🔙 بازگشت به دقیقه", callback_data="rem_back_minute")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -332,7 +324,6 @@ async def calendar_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     data = query.data
     
-    # ===== انتخاب سال =====
     if data.startswith("rem_year_"):
         year = int(data.split("_")[2])
         context.user_data["reminder_data"]["year"] = year
@@ -352,7 +343,6 @@ async def calendar_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["reminder_data"]["year_range_start"] = start
         await show_year_selection(update, context, edit=True)
     
-    # ===== انتخاب ماه =====
     elif data.startswith("rem_month_"):
         month = int(data.split("_")[2])
         context.user_data["reminder_data"]["month"] = month
@@ -363,7 +353,6 @@ async def calendar_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["reminder_step"] = "year"
         await show_year_selection(update, context, edit=True)
     
-    # ===== انتخاب روز =====
     elif data.startswith("rem_day_"):
         day = int(data.split("_")[2])
         context.user_data["reminder_data"]["day"] = day
@@ -374,7 +363,6 @@ async def calendar_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["reminder_step"] = "month"
         await show_month_selection(update, context, edit=True)
     
-    # ===== انتخاب ساعت =====
     elif data.startswith("rem_hour_"):
         hour = int(data.split("_")[2])
         context.user_data["reminder_data"]["hour"] = hour
@@ -385,7 +373,6 @@ async def calendar_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["reminder_step"] = "day"
         await show_day_selection(update, context, edit=True)
     
-    # ===== انتخاب دقیقه =====
     elif data.startswith("rem_minute_"):
         minute = int(data.split("_")[2])
         context.user_data["reminder_data"]["minute"] = minute
@@ -401,16 +388,21 @@ async def calendar_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await show_minute_selection(update, context, edit=True)
     
     elif data == "noop":
-        pass  # دکمه‌های غیرفعال
+        pass
 
-# ===== دریافت متن یادآوری =====
+# ===== دریافت متن یادآوری (اصلاح‌شده) =====
 async def handle_reminder_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     chat_id = str(update.effective_chat.id)
     text = update.message.text.strip()
     
+    # === پاک کردن وضعیت در هر صورت (اگر خطا باشد، بعداً دوباره تنظیم می‌شود) ===
+    # اما اگر خطا نباشد، در انتها پاک می‌شود.
+    
     if not text:
         await update.message.reply_text("❌ متن نمی‌تواند خالی باشد. لطفاً دوباره بنویسید.")
+        # پاک کردن waiting_for تا کاربر بتواند سوال عادی بپرسد
+        context.user_data.pop("waiting_for", None)
         return
     
     data_dict = context.user_data.get("reminder_data", {})
@@ -423,9 +415,9 @@ async def handle_reminder_text(update: Update, context: ContextTypes.DEFAULT_TYP
     if not year or not month or not day:
         await update.message.reply_text("❌ خطا در دریافت تاریخ. لطفاً دوباره تلاش کنید.")
         context.user_data.pop("waiting_for", None)
+        context.user_data.pop("reminder_data", None)
         return
     
-    # بررسی نهایی اینکه تاریخ آینده باشد
     if not is_future_date(year, month, day, hour, minute):
         await update.message.reply_text(
             "❌ **تاریخ انتخاب‌شده گذشته است!**\n\n"
@@ -433,6 +425,7 @@ async def handle_reminder_text(update: Update, context: ContextTypes.DEFAULT_TYP
             "لطفاً دوباره تلاش کنید."
         )
         context.user_data.pop("waiting_for", None)
+        context.user_data.pop("reminder_data", None)
         return
     
     remind_at = jalali_to_gregorian(year, month, day, hour, minute)
