@@ -15,7 +15,7 @@ from handlers.memory import (
 from handlers.reminder import (
     show_reminder_menu, reminder_new, reminder_list,
     reminder_cancel, reminder_cancel_confirm, handle_reminder_text,
-    calendar_handler  # اضافه شد
+    calendar_handler
 )
 from handlers.ai import handle_message, status_command
 from handlers.buttons import button_handler
@@ -39,14 +39,10 @@ def main():
         .build()
     )
 
-    # ===== ثبت هندلرهای دستوری =====
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
-    
-    # ===== ثبت هندلر دکمه‌های اینلاین =====
     application.add_handler(CallbackQueryHandler(button_handler))
-    
-    # ===== هندلر پیام‌های متنی با تشخیص وضعیت =====
+
     async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         waiting_for = context.user_data.get("waiting_for")
         if waiting_for == "reminder_text":
@@ -55,10 +51,19 @@ def main():
             await handle_memory_text(update, context)
         else:
             await handle_message(update, context)
-    
+
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler))
 
-    print("🤖 ربات با ساختار ماژولار و منوی کامل روشن شد...")
+    print("🤖 ربات با تقویم شمسی مرحله‌ای روشن شد...")
+    
+    # ===== حذف صریح Webhook قبل از شروع Polling =====
+    import asyncio
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(application.bot.delete_webhook())
+    loop.close()
+    # ===== پایان بخش حذف Webhook =====
+
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
