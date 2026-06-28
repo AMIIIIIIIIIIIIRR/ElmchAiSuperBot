@@ -1,49 +1,135 @@
 import logging
 import requests
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+import asyncio
+from telegram import Update
 from telegram.ext import ContextTypes
 from config import FREELLMAPI_KEY, FREELLMAPI_URL, BASE_URL, SHORT_TERM_MEMORY
-from database import save_message, get_recent_history, get_memories, get_user_personality
-from personalities import get_personality
+from database import (
+    save_message, get_recent_history, get_memories,
+    get_web_search_status
+)
+from duckduckgo_search import DDGS
 
+# ===== تنظیمات جستجو =====
+SEARCH_TIMEOUT = 8
+MAX_SEARCH_RESULTS = 3
+
+# ===== کلمات کلیدی با وزن =====
+def calculate_search_weight(text: str) -> int:
+    text_lower = text.lower()
+    weight = 0
+
+    high_weight = ["قیمت", "ارز", "دلار", "یورو", "طلا", "سکه", "بیت‌کوین"]
+    for w in high_weight:
+        if w in text_lower:
+            weight += 3
+
+    mid_weight = ["امروز", "الان", "همین الان", "اخبار", "جدید", "آخرین"]
+    for w in mid_weight:
+        if w in text_lower:
+            weight += 2
+
+    low_weight = ["بهترین", "برترین", "موفق‌ترین", "معروف‌ترین"]
+    for w in low_weight:
+        if w in text_lower:
+            weight += 1
+
+    if text_lower.endswith("؟") or "چیست" in text_lower or "چند" in text_lower:
+        weight += 1
+
+    return weight
+
+def needs_search(text: str) -> bool:
+    if any(word in text for word in ["جستجو", "اینترنت", "آنلاین"]):
+        return True
+    return calculate_search_weight(text) >= 3
+
+def perform_search(query: str, max_results: int = MAX_SEARCH_RESULTS):
+    try:
+        with DDGS() as ddgs:
+            return list(ddgs.text(query, max_results=max_results))
+    except Exception as e:
+        logging.error(f"Search error: {e}")
+        return []
+
+async def get_search_results(query: str):
+    try:
+        loop = asyncio.get_event_loop()
+        results = await asyncio.wait_for(
+            loop.run_in_executor(None, perform_search, query, MAX_SEARCH_RESULTS),
+            timeout=SEARCH_TIMEOUT
+        )
+        return results
+    except asyncio.TimeoutError:
+        logging.warning(f"Search timed out for: {query}")
+        return []
+    except Exception as e:
+        logging.error(f"Search exception: {e}")
+        return []
+
+def build_search_context(query: str, results: list) -> str:
+    if not results:
+        return f"سوال کاربر: {query}\n\n(نتیجه‌ای پیدا نشد.)"
+    text = f"سوال کاربر: {query}\n\nنتایج جستجو:\n"
+    for i, r in enumerate(results, 1):
+        title = r.get("title", "بدون عنوان")
+        body = r.get("body", "توضیحی در دسترس نیست")
+        link = r.get("href", "#")
+        text += f"{i}. عنوان: {title}\n   لینک: {link}\n   خلاصه: {body[:300]}\n\n"
+    return text
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     user_message = update.message.text or ""
-    if user_message.startswith("/"):
+    if user_message.startswith('/'):
         return
 
     processing_msg = await update.message.reply_text("🤔 در حال پردازش...")
+
     history = await get_recent_history(user_id, SHORT_TERM_MEMORY)
     memories = await get_memories(user_id)
 
-    # شخصیت انتخاب‌شده کاربر
-    personality_key = await get_user_personality(user_id)
-    personality = get_personality(personality_key)
-    persona_prompt = personality["system_prompt"]
+    # ===== بررسی وضعیت جستجوی وب =====
+    web_search_enabled = await get_web_search_status(user_id)
+    use_search = False
+    search_results = None
+    search_footer = ""
 
-    memory_block = (
-        "\n".join(f"• {m}" for m in memories) if memories else "هیچ یادداشتی ذخیره نشده است."
-    )
+    if web_search_enabled and needs_search(user_message):
+        await processing_msg.edit_text("🔍 در حال جستجو و تحلیل...")
+        search_results = await get_search_results(user_message)
+        if search_results:
+            search_footer = "\n\n🌐 این پاسخ با استفاده از جستجوی اینترنت تهیه شده است."
+        else:
+            search_footer = "\n\n⚠️ جستجو انجام نشد (عدم دسترسی یا زمان‌بر بودن)."
 
-    system_prompt = (
-        f"{persona_prompt}\n\n"
-        f"📌 یادداشت‌های کاربر (اطلاعات مهم درباره خودش):\n{memory_block}\n\n"
-        "🔹 قوانین کلی:\n"
-        "1. همیشه به فارسی پاسخ بده.\n"
-        "2. لحن و سبک گفتار خود را طبق شخصیتی که در بالا تعریف شده حفظ کن.\n"
-        "3. از یادداشت‌های کاربر در پاسخ‌هایت استفاده کن."
-    )
+    # ===== ساخت system_prompt =====
+    base_system = """
+شما یک دستیار هوشمند و حرفه‌ای هستید که به زبان فارسی پاسخ می‌دهید.
+
+📌 **یادداشت‌های کاربر (اطلاعات مهم):**
+{memories}
+
+🔹 **قوانین:**
+1. همیشه به فارسی پاسخ دهید.
+2. از یادداشت‌های کاربر در پاسخ‌های خود استفاده کنید.
+3. پاسخ‌ها باید روان، ادبی و مفید باشند.
+"""
+
+    if use_search and search_results:
+        search_context = build_search_context(user_message, search_results)
+        system_prompt = base_system.format(memories="\n".join(f"• {m}" for m in memories) if memories else "هیچ یادداشتی ذخیره نشده است.")
+        system_prompt += f"\n\n🔍 **اطلاعات به‌روز از جستجوی وب:**\n{search_context}"
+        system_prompt += "\n\nلطفاً بر اساس اطلاعات بالا و دانش خود، پاسخی جامع و مفید به کاربر بدهید. در صورت استفاده از اطلاعات جستجو، حتماً به منابع اشاره کنید."
+    else:
+        system_prompt = base_system.format(memories="\n".join(f"• {m}" for m in memories) if memories else "هیچ یادداشتی ذخیره نشده است.")
 
     messages = [{"role": "system", "content": system_prompt}]
     for role, content in history:
         messages.append({"role": role, "content": content})
     messages.append({"role": "user", "content": user_message})
 
-    headers = {
-        "Authorization": f"Bearer {FREELLMAPI_KEY}",
-        "Content-Type": "application/json",
-    }
+    headers = {"Authorization": f"Bearer {FREELLMAPI_KEY}", "Content-Type": "application/json"}
     payload = {"model": "auto", "messages": messages}
 
     try:
@@ -61,12 +147,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await save_message(user_id, "assistant", ai_reply)
         await processing_msg.delete()
 
-        full_reply = (
-            f"{ai_reply}\n\n---\n"
-            f"🎭 شخصیت: {personality['name']}\n"
-            f"🤖 مدل: {model_used}"
-        )
+        full_reply = f"{ai_reply}{search_footer}\n\n---\n🤖 مدل: {model_used}"
         await update.message.reply_text(full_reply)
+
     except requests.exceptions.RequestException as e:
         logging.error(f"AI request error: {e}")
         await processing_msg.edit_text("⚠️ سرور هوش مصنوعی در دسترس نیست. لطفاً بعداً امتحان کنید.")
@@ -74,20 +157,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logging.exception(f"Unexpected error: {e}")
         await processing_msg.edit_text(f"❌ خطای غیرمنتظره: {str(e)[:100]}")
 
-
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.callback_query:
         await _render_status(update.callback_query.message, edit=True)
     else:
         await _render_status(update.message, edit=False)
 
-
 async def _render_status(message_obj, edit: bool):
-    if edit:
-        status_msg = await message_obj.edit_text("⏳ در حال دریافت وضعیت مدل‌ها...")
-    else:
-        status_msg = await message_obj.reply_text("⏳ در حال دریافت وضعیت مدل‌ها...")
-
     try:
         response = requests.get(
             f"{BASE_URL}/models",
@@ -95,12 +171,12 @@ async def _render_status(message_obj, edit: bool):
             timeout=10,
         )
         if response.status_code != 200:
-            await status_msg.edit_text(f"❌ خطا در دریافت وضعیت: {response.status_code}")
+            await message_obj.edit_text(f"❌ خطا در دریافت وضعیت: {response.status_code}")
             return
 
         models = response.json().get("data", [])
         if not models:
-            await status_msg.edit_text("❌ هیچ مدلی در دسترس نیست.")
+            await message_obj.edit_text("❌ هیچ مدلی در دسترس نیست.")
             return
 
         available, unavailable, limited = [], [], []
@@ -122,11 +198,7 @@ async def _render_status(message_obj, edit: bool):
         if unavailable:
             reply += "❌ **در دسترس نیست:**\n" + "\n".join(f"• `{m}`" for m in unavailable) + "\n\n"
 
-        keyboard = [
-            [InlineKeyboardButton("🔄 به‌روزرسانی", callback_data="refresh_status")],
-            [InlineKeyboardButton("🏠 بازگشت به منو", callback_data="back_main")],
-        ]
-        await status_msg.edit_text(reply, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+        await message_obj.edit_text(reply, parse_mode="Markdown")
     except Exception as e:
         logging.error(f"Error fetching models: {e}")
-        await status_msg.edit_text(f"❌ خطا: {str(e)[:100]}")
+        await message_obj.edit_text(f"❌ خطا در ارتباط با سرور: {str(e)[:100]}")
