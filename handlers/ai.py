@@ -109,7 +109,7 @@ async def _render_status(message_obj, edit: bool):
 
         keyboard = [
             [InlineKeyboardButton("🔄 به‌روزرسانی", callback_data="refresh_status")],
-            [InlineKeyboardButton("🏠 بازگشت به منو", callback_data="back_to_menu")],
+            [InlineKeyboardButton("🏠 بازگشت به منو", callback_data="back_main")],  # ← تغییر به back_main
         ]
         await status_msg.edit_text(reply, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
     except Exception as e:
