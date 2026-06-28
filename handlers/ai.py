@@ -13,7 +13,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_message.startswith("/"):
         return
 
-    processing_msg = await update.message.reply_text("🤔 وایسا الان میگم...")
+    processing_msg = await update.message.reply_text("🤔 در حال پردازش...")
     history = await get_recent_history(user_id, SHORT_TERM_MEMORY)
     memories = await get_memories(user_id)
 
