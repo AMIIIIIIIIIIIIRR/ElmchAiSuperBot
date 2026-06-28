@@ -53,3 +53,7 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, edi
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """دستور /start – نمایش منوی اصلی با توضیح کامل"""
     await show_main_menu(update, context)
+
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """دستور /help – نمایش منوی اصلی یا راهنما"""
+    await show_main_menu(update, context)
