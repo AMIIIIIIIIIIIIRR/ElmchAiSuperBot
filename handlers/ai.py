@@ -14,36 +14,25 @@ from ddgs import DDGS
 SEARCH_TIMEOUT = 8
 MAX_SEARCH_RESULTS = 3
 
-# ===== مدل‌های مجاز برای جستجوی اینترنت (بر اساس لیست شما) =====
+# ===== مدل‌های مجاز برای جستجوی اینترنت (به‌ترتیب اولویت) =====
 SEARCH_ALLOWED_MODELS = [
-    # Gemini
     "gemini-2.5-flash",
     "gemini-2.5-flash-lite",
     "gemini-3-flash-preview",
     "gemini-3.5-flash",
-    
-    # Llama
     "llama-3.3-70b",
     "llama-3.3-70b-fp8-fast-cf",
     "llama-3.1-8b-instant",
-    
-    # Mistral
     "mistral-large-3",
     "mistral-medium-3.5",
     "mistral-small-4",
     "codestral",
-    
-    # Qwen
     "qwen3-coder-480b-free",
     "qwen3-next-80b-free",
-    
-    # GPT-OSS
     "gpt-oss-120b-free",
     "gpt-oss-120b-groq",
     "gpt-oss-20b-free",
     "gpt-oss-20b-groq",
-    
-    
 ]
 
 # ===== کلمات کلیدی با وزن =====
@@ -110,14 +99,6 @@ def build_search_context(query: str, results: list) -> str:
         text += f"{i}. عنوان: {title}\n   لینک: {link}\n   خلاصه: {body[:300]}\n\n"
     return text
 
-def is_model_allowed_for_search(model_name: str) -> bool:
-    """بررسی اینکه مدل مجاز به جستجو است یا نه"""
-    model_lower = model_name.lower()
-    for allowed in SEARCH_ALLOWED_MODELS:
-        if allowed in model_lower:
-            return True
-    return False
-
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     user_message = update.message.text or ""
@@ -131,38 +112,21 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     web_search_enabled = await get_web_search_status(user_id)
 
-    headers = {"Authorization": f"Bearer {FREELLMAPI_KEY}", "Content-Type": "application/json"}
-    payload = {"model": "auto", "messages": [{"role": "user", "content": user_message}]}
+    # ===== تشخیص نیاز به جستجو =====
+    use_search = web_search_enabled and needs_search(user_message)
+    search_results = None
+    search_footer = ""
 
-    try:
-        # ===== مرحله ۱: شناسایی مدل فعلی =====
-        response = requests.post(FREELLMAPI_URL, headers=headers, json=payload, timeout=60)
-        response.raise_for_status()
-        result = response.json()
-        choices = result.get("choices") or []
-        if not choices:
-            await processing_msg.edit_text("❌ خطا در دریافت پاسخ از هوش مصنوعی.")
-            return
+    if use_search:
+        await processing_msg.edit_text("🔍 در حال جستجو و تحلیل...")
+        search_results = await get_search_results(user_message)
+        if search_results:
+            search_footer = "\n\n🌐 این پاسخ با استفاده از جستجوی اینترنت تهیه شده است."
+        else:
+            search_footer = "\n\n⚠️ جستجو انجام نشد (عدم دسترسی یا زمان‌بر بودن)."
 
-        model_used = result.get("model", "نامشخص")
-        
-        # ===== مرحله ۲: آیا این مدل مجاز به جستجو است؟ =====
-        search_allowed = is_model_allowed_for_search(model_used)
-        
-        use_search = False
-        search_results = None
-        search_footer = ""
-
-        if web_search_enabled and needs_search(user_message) and search_allowed:
-            await processing_msg.edit_text("🔍 در حال جستجو و تحلیل...")
-            search_results = await get_search_results(user_message)
-            if search_results:
-                search_footer = "\n\n🌐 این پاسخ با استفاده از جستجوی اینترنت تهیه شده است."
-            else:
-                search_footer = "\n\n⚠️ جستجو انجام نشد (عدم دسترسی یا زمان‌بر بودن)."
-
-        # ===== مرحله ۳: ساخت system_prompt =====
-        base_system = """
+    # ===== ساخت system_prompt =====
+    base_system = """
 شما یک دستیار هوشمند و حرفه‌ای هستید که به زبان فارسی پاسخ می‌دهید.
 
 📌 **یادداشت‌های کاربر (اطلاعات مهم):**
@@ -174,43 +138,101 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 3. پاسخ‌ها باید روان، ادبی و مفید باشند.
 """
 
-        if use_search and search_results:
-            search_context = build_search_context(user_message, search_results)
-            system_prompt = base_system.format(memories="\n".join(f"• {m}" for m in memories) if memories else "هیچ یادداشتی ذخیره نشده است.")
-            system_prompt += f"\n\n🔍 **اطلاعات به‌روز از جستجوی وب:**\n{search_context}"
-            system_prompt += "\n\nلطفاً بر اساس اطلاعات بالا و دانش خود، پاسخی جامع و مفید به کاربر بدهید. در صورت استفاده از اطلاعات جستجو، حتماً به منابع اشاره کنید."
-        else:
-            system_prompt = base_system.format(memories="\n".join(f"• {m}" for m in memories) if memories else "هیچ یادداشتی ذخیره نشده است.")
+    if use_search and search_results:
+        search_context = build_search_context(user_message, search_results)
+        system_prompt = base_system.format(memories="\n".join(f"• {m}" for m in memories) if memories else "هیچ یادداشتی ذخیره نشده است.")
+        system_prompt += f"\n\n🔍 **اطلاعات به‌روز از جستجوی وب:**\n{search_context}"
+        system_prompt += "\n\nلطفاً بر اساس اطلاعات بالا و دانش خود، پاسخی جامع و مفید به کاربر بدهید. در صورت استفاده از اطلاعات جستجو، حتماً به منابع اشاره کنید."
+    else:
+        system_prompt = base_system.format(memories="\n".join(f"• {m}" for m in memories) if memories else "هیچ یادداشتی ذخیره نشده است.")
 
-        messages = [{"role": "system", "content": system_prompt}]
-        for role, content in history:
-            messages.append({"role": role, "content": content})
-        messages.append({"role": "user", "content": user_message})
+    messages = [{"role": "system", "content": system_prompt}]
+    for role, content in history:
+        messages.append({"role": role, "content": content})
+    messages.append({"role": "user", "content": user_message})
 
-        # ===== مرحله ۴: درخواست نهایی =====
-        payload = {"model": model_used, "messages": messages}
-        response = requests.post(FREELLMAPI_URL, headers=headers, json=payload, timeout=60)
-        response.raise_for_status()
-        result = response.json()
-        choices = result.get("choices") or []
-        if not choices:
-            await processing_msg.edit_text("❌ خطا در دریافت پاسخ از هوش مصنوعی.")
+    headers = {"Authorization": f"Bearer {FREELLMAPI_KEY}", "Content-Type": "application/json"}
+
+    # ===== انتخاب مدل با Fallback =====
+    if use_search and search_results:
+        selected_model = None
+        last_error = None
+
+        for model in SEARCH_ALLOWED_MODELS:
+            try:
+                payload = {"model": model, "messages": messages}
+                response = requests.post(FREELLMAPI_URL, headers=headers, json=payload, timeout=60)
+                
+                if response.status_code == 200:
+                    selected_model = model
+                    break
+                elif response.status_code == 429:
+                    logging.warning(f"⚠️ مدل {model} به محدودیت رسید. تلاش با مدل بعدی...")
+                    last_error = f"429 Too Many Requests on {model}"
+                    continue
+                else:
+                    logging.warning(f"⚠️ مدل {model} با خطای {response.status_code} مواجه شد. تلاش با مدل بعدی...")
+                    last_error = f"Error {response.status_code} on {model}"
+                    continue
+            except Exception as e:
+                logging.warning(f"⚠️ خطا در مدل {model}: {e}")
+                last_error = str(e)
+                continue
+
+        if selected_model is None:
+            selected_model = "auto"
+            logging.warning(f"⚠️ همه مدل‌های مجاز شکست خوردند. آخرین خطا: {last_error}. Fallback به auto.")
+
+        # ===== ارسال درخواست نهایی =====
+        payload = {"model": selected_model, "messages": messages}
+        try:
+            response = requests.post(FREELLMAPI_URL, headers=headers, json=payload, timeout=60)
+            response.raise_for_status()
+            result = response.json()
+            choices = result.get("choices") or []
+            if not choices:
+                await processing_msg.edit_text("❌ خطا در دریافت پاسخ از هوش مصنوعی.")
+                return
+
+            ai_reply = choices[0]["message"]["content"]
+            model_used = result.get("model", "نامشخص")
+            await save_message(user_id, "user", user_message)
+            await save_message(user_id, "assistant", ai_reply)
+            await processing_msg.delete()
+
+            full_reply = f"{ai_reply}{search_footer}\n\n---\n🤖 مدل: {model_used}"
+            await update.message.reply_text(full_reply)
+
+        except requests.exceptions.RequestException as e:
+            logging.error(f"AI request error: {e}")
+            await processing_msg.edit_text("⚠️ سرور هوش مصنوعی در دسترس نیست. لطفاً بعداً امتحان کنید.")
             return
 
-        ai_reply = choices[0]["message"]["content"]
-        await save_message(user_id, "user", user_message)
-        await save_message(user_id, "assistant", ai_reply)
-        await processing_msg.delete()
+    else:
+        # ===== اگر جستجو فعال نیست، از auto استفاده کن =====
+        payload = {"model": "auto", "messages": messages}
+        try:
+            response = requests.post(FREELLMAPI_URL, headers=headers, json=payload, timeout=60)
+            response.raise_for_status()
+            result = response.json()
+            choices = result.get("choices") or []
+            if not choices:
+                await processing_msg.edit_text("❌ خطا در دریافت پاسخ از هوش مصنوعی.")
+                return
 
-        full_reply = f"{ai_reply}{search_footer}\n\n---\n🤖 مدل: {model_used}"
-        await update.message.reply_text(full_reply)
+            ai_reply = choices[0]["message"]["content"]
+            model_used = result.get("model", "نامشخص")
+            await save_message(user_id, "user", user_message)
+            await save_message(user_id, "assistant", ai_reply)
+            await processing_msg.delete()
 
-    except requests.exceptions.RequestException as e:
-        logging.error(f"AI request error: {e}")
-        await processing_msg.edit_text("⚠️ سرور هوش مصنوعی در دسترس نیست. لطفاً بعداً امتحان کنید.")
-    except Exception as e:
-        logging.exception(f"Unexpected error: {e}")
-        await processing_msg.edit_text(f"❌ خطای غیرمنتظره: {str(e)[:100]}")
+            full_reply = f"{ai_reply}{search_footer}\n\n---\n🤖 مدل: {model_used}"
+            await update.message.reply_text(full_reply)
+
+        except requests.exceptions.RequestException as e:
+            logging.error(f"AI request error: {e}")
+            await processing_msg.edit_text("⚠️ سرور هوش مصنوعی در دسترس نیست. لطفاً بعداً امتحان کنید.")
+            return
 
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.callback_query:
