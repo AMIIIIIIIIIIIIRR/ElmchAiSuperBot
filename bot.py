@@ -1,67 +1,68 @@
-import logging
-from telegram import Update
-from telegram.ext import (
-    Application, CommandHandler, MessageHandler, filters,
-    CallbackQueryHandler, ContextTypes
-)
-from config import TELEGRAM_TOKEN
-from database import init_db, close_db
-from handlers.base import start_command, help_command
-from handlers.memory import (
-    show_memory_menu, memory_save, memory_view, memory_delete,
-    memory_delete_confirm, memory_clear, memory_clear_confirm,
-    handle_memory_text
-)
-from handlers.reminder import (
-    show_reminder_menu, reminder_new, reminder_list,
-    reminder_cancel, reminder_cancel_confirm, handle_reminder_text,
-    calendar_handler
-)
-from handlers.ai import handle_message, status_command
-from handlers.buttons import button_handler
-
-logging.basicConfig(level=logging.INFO)
-
-async def post_init(application):
-    # ===== مقداردهی دیتابیس =====
-    await init_db()
+async def handle_reminder_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+    chat_id = str(update.effective_chat.id)
+    text = update.message.text.strip()
     
-    # ===== حذف Webhook برای جلوگیری از Conflict =====
-    await application.bot.delete_webhook()
+    # ===== اگر متن خالی بود =====
+    if not text:
+        await update.message.reply_text("❌ متن نمی‌تواند خالی باشد. لطفاً دوباره بنویسید.")
+        context.user_data.pop("waiting_for", None)  # ← پاک کردن حالت
+        return
     
-    # ===== ثبت کامندها =====
-    commands = [
-        ("start", "نمایش منوی اصلی"),
-        ("help", "راهنما"),
-    ]
-    await application.bot.set_my_commands(commands)
-
-def main():
-    application = (
-        Application.builder()
-        .token(TELEGRAM_TOKEN)
-        .post_init(post_init)
-        .post_shutdown(close_db)
-        .build()
+    data_dict = context.user_data.get("reminder_data", {})
+    year = data_dict.get("year")
+    month = data_dict.get("month")
+    day = data_dict.get("day")
+    hour = data_dict.get("hour", 0)
+    minute = data_dict.get("minute", 0)
+    
+    # ===== اگر تاریخ ناقص بود =====
+    if not year or not month or not day:
+        await update.message.reply_text("❌ خطا در دریافت تاریخ. لطفاً دوباره تلاش کنید.")
+        context.user_data.pop("waiting_for", None)
+        context.user_data.pop("reminder_data", None)
+        return
+    
+    # ===== اگر تاریخ گذشته بود =====
+    if not is_future_date(year, month, day, hour, minute):
+        await update.message.reply_text(
+            "❌ **تاریخ انتخاب‌شده گذشته است!**\n\n"
+            f"تاریخ انتخاب‌شده: {format_jalali_datetime(year, month, day, hour, minute)}\n\n"
+            "لطفاً دوباره تلاش کنید."
+        )
+        context.user_data.pop("waiting_for", None)
+        context.user_data.pop("reminder_data", None)
+        return
+    
+    # ===== ذخیره یادآوری =====
+    remind_at = jalali_to_gregorian(year, month, day, hour, minute)
+    now = datetime.now()
+    
+    job_id = f"reminder_{user_id}_{int(remind_at.timestamp())}"
+    reminder_id = await save_reminder(user_id, chat_id, text, remind_at, job_id)
+    
+    delta = remind_at - now
+    context.job_queue.run_once(
+        send_reminder,
+        when=delta,
+        name=job_id,
+        data={
+            "reminder_id": reminder_id,
+            "user_id": user_id,
+            "chat_id": chat_id,
+            "message": text,
+            "job_id": job_id
+        }
     )
-
-    application.add_handler(CommandHandler("start", start_command))
-    application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(CallbackQueryHandler(button_handler))
-
-    async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        waiting_for = context.user_data.get("waiting_for")
-        if waiting_for == "reminder_text":
-            await handle_reminder_text(update, context)
-        elif waiting_for == "memory_text":
-            await handle_memory_text(update, context)
-        else:
-            await handle_message(update, context)
-
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler))
-
-    print("🤖 ربات با تقویم شمسی مرحله‌ای و Webhook حذف‌شده روشن شد...")
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
-
-if __name__ == "__main__":
-    main()
+    
+    # ===== پاک کردن همه‌ی وضعیت‌ها (موفقیت) =====
+    context.user_data.pop("waiting_for", None)
+    context.user_data.pop("reminder_data", None)
+    context.user_data.pop("reminder_step", None)
+    
+    await update.message.reply_text(
+        f"✅ **یادآوری ثبت شد!**\n\n"
+        f"📝 {text}\n"
+        f"⏰ {remind_at.strftime('%Y-%m-%d %H:%M:%S')}\n"
+        f"🆔 شماره: {reminder_id}"
+    )
