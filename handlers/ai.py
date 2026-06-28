@@ -43,9 +43,7 @@ SEARCH_ALLOWED_MODELS = [
     "gpt-oss-20b-free",
     "gpt-oss-20b-groq",
     
-    # FreeLLMAPI Meta
-    "free-smart",
-    "free-fast"
+    
 ]
 
 # ===== کلمات کلیدی با وزن =====
