@@ -1,5 +1,6 @@
 import asyncpg
 from config import DATABASE_URL
+from telegram.ext import Application  # برای type hint
 
 db_pool: asyncpg.Pool | None = None
 
@@ -25,7 +26,7 @@ async def init_db():
                 timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        # جدول یادآوری‌ها (جدید)
+        # جدول یادآوری‌ها
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS reminders (
                 id SERIAL PRIMARY KEY,
@@ -44,9 +45,12 @@ async def init_db():
         await conn.execute("CREATE INDEX IF NOT EXISTS idx_reminders_remind_at ON reminders(remind_at)")
     print("✅ دیتابیس PostgreSQL آماده است.")
 
-async def close_db():
+# ===== بستن اتصالات (با پذیرش آرگومان Application) =====
+async def close_db(app: Application = None):  # ← آرگومان اضافه شد
+    """بستن Pool دیتابیس"""
     if db_pool:
         await db_pool.close()
+        print("🔒 اتصالات دیتابیس بسته شد.")
 
 # ===== توابع تاریخچه =====
 async def save_message(user_id: str, role: str, content: str):
@@ -96,7 +100,7 @@ async def delete_memory(user_id: str, memory_text: str):
             user_id, memory_text,
         )
 
-# ===== توابع یادآوری (جدید) =====
+# ===== توابع یادآوری =====
 async def save_reminder(user_id: str, chat_id: str, message: str, remind_at, job_id: str):
     async with db_pool.acquire() as conn:
         return await conn.fetchval(
