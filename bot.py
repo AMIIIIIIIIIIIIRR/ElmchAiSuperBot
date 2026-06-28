@@ -20,13 +20,13 @@ from handlers.reminder import (
 )
 from handlers.ai import handle_message, status_command
 from handlers.buttons import button_handler
+from handlers.personality import personality_command
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
 async def reschedule_pending_reminders(application: Application):
-    """پس از هر ری‌استارت، یادآوری‌های ذخیره‌شده در DB را روی JobQueue دوباره شِدول می‌کند."""
     if application.job_queue is None:
         logger.error("❌ JobQueue نصب نیست! requirements باید شامل python-telegram-bot[job-queue] باشد.")
         return
@@ -51,7 +51,6 @@ async def reschedule_pending_reminders(application: Application):
 
         delta = r["remind_at"] - now
         if delta.total_seconds() <= 0:
-            # زمانش گذشته (بات خاموش بوده) → فوراً ارسال شود
             application.job_queue.run_once(send_reminder, when=0, name=job_id, data=data)
             fired_now += 1
         else:
@@ -68,11 +67,10 @@ async def post_init(application: Application):
     commands = [
         ("start", "نمایش منوی اصلی"),
         ("help", "راهنما"),
+        ("personality", "تغییر شخصیت ربات"),
         ("cancel", "لغو عملیات جاری"),
     ]
     await application.bot.set_my_commands(commands)
-
-    # بازخوانی و شِدول مجدد یادآوری‌ها (مهم‌ترین تغییر)
     await reschedule_pending_reminders(application)
 
 
@@ -100,6 +98,7 @@ def main():
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("cancel", cancel_command))
+    application.add_handler(CommandHandler("personality", personality_command))
     application.add_handler(CallbackQueryHandler(button_handler))
 
     async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -113,7 +112,7 @@ def main():
 
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler))
 
-    print("🤖 ربات با تقویم شمسی مرحله‌ای و Webhook حذف‌شده روشن شد...")
+    print("🤖 ربات با سیستم شخصیت‌ها روشن شد...")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
