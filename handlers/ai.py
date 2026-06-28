@@ -8,7 +8,7 @@ from database import (
     save_message, get_recent_history, get_memories,
     get_web_search_status
 )
-from duckduckgo_search import DDGS
+from ddgs import DDGS  # ← تغییر مهم
 
 # ===== تنظیمات جستجو =====
 SEARCH_TIMEOUT = 8
