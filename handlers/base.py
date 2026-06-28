@@ -2,60 +2,54 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from utils.helpers import safe_reply
 
+# ===== منوی اصلی =====
+MAIN_MENU = [
+    [InlineKeyboardButton("🤖 هوش مصنوعی", callback_data="menu_ai")],
+    [InlineKeyboardButton("🧠 حافظه", callback_data="menu_memory")],
+    [InlineKeyboardButton("⏰ یادآوری", callback_data="menu_reminder")],
+    [InlineKeyboardButton("📊 وضعیت مدل‌ها", callback_data="menu_status")],
+    [InlineKeyboardButton("❓ راهنما", callback_data="menu_help")],
+]
+
+async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: bool = False):
+    """نمایش منوی اصلی با توضیح کامل ربات"""
+    text = """
+🤖 **به ربات هوشمند خوش آمدید!** 🌟
+
+من یک دستیار شخصی هستم که با استفاده از **هوش مصنوعی** به شما کمک می‌کنم.
+
+---
+
+### 🧠 **چه کارهایی می‌توانم انجام دهم؟**
+
+| بخش | توضیح |
+| :--- | :--- |
+| 🤖 **هوش مصنوعی** | سوالات خود را بپرسید و پاسخ بگیرید |
+| 🧠 **حافظه** | نکات مهم را ذخیره کنید و هر زمان نیاز داشتید، بازیابی کنید |
+| ⏰ **یادآوری** | یادآوری‌های خود را تنظیم کنید و سر وقت دریافت کنید |
+| 📊 **وضعیت** | وضعیت مدل‌های هوش مصنوعی را ببینید |
+
+---
+
+### 💡 **چگونه شروع کنم؟**
+
+1️⃣ روی یکی از دکمه‌های زیر کلیک کنید.  
+2️⃣ در هر بخش، دستورالعمل‌های مربوطه را دنبال کنید.  
+3️⃣ برای بازگشت به این منو، همیشه دکمه‌ی **🔙 بازگشت** وجود دارد.
+
+---
+
+📌 **نکته:** من اطلاعات شما را در یک پایگاه داده امن ذخیره می‌کنم و فقط خودتان به آن دسترسی دارید.
+
+✨ **پیشنهاد:** با دکمه‌ی **🧠 حافظه** شروع کنید و اولین یادداشت خود را ذخیره کنید!
+"""
+    reply_markup = InlineKeyboardMarkup(MAIN_MENU)
+    
+    if edit:
+        await update.callback_query.edit_message_text(text, parse_mode="Markdown", reply_markup=reply_markup)
+    else:
+        await safe_reply(update.message, text, parse_mode="Markdown", reply_markup=reply_markup)
+
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_name = update.effective_user.first_name or "کاربر عزیز"
-    welcome_text = f"""
-🌟 **به ربات هوشمند خوش آمدید، {user_name}!** 🌟
-
-🧠 **سیستم حافظه‌ی هوشمند:**
-• 📝 **حافظه‌ی کوتاه‌مدت**: ۵ پیام آخر برای بافت مکالمه
-• 💾 **حافظه‌ی بلندمدت**: ذخیره اطلاعات مهم با دستورات
-
-📌 **دستورات حافظه:**
-• `/remember [متن]` – ذخیره در حافظه‌ی بلندمدت
-• `/memories` – نمایش یادداشت‌ها
-• `/forget [متن]` – حذف یک یادداشت
-• `/clear_memories` – پاک کردن همه‌ی یادداشت‌ها
-• `/clear` – پاک کردن حافظه‌ی کوتاه‌مدت
-
-✨ **سایر قابلیت‌ها:**
-• `/status` – وضعیت مدل‌ها
-• `/help` – راهنما
-
-💡 فقط سوال خود را بپرسید!
-    """
-    keyboard = [
-        [InlineKeyboardButton("📊 وضعیت مدل‌ها", callback_data="status_btn")],
-        [InlineKeyboardButton("🧹 پاک کردن حافظه", callback_data="clear_btn")],
-        [InlineKeyboardButton("📖 راهنما", callback_data="help_btn")],
-    ]
-    await safe_reply(
-        update.message, welcome_text,
-        parse_mode="Markdown",
-        reply_markup=InlineKeyboardMarkup(keyboard),
-    )
-
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    help_text = """
-📖 **راهنمای ربات**
-🧠 **سیستم حافظه‌ی هوشمند:**
-
-🔹 **حافظه‌ی کوتاه‌مدت (۵ پیام آخر)**
-• برای بافت مکالمه استفاده می‌شود
-• با دستور `/clear` پاک می‌شود
-
-🔹 **حافظه‌ی بلندمدت (یادداشت‌ها)**
-• `/remember [متن]` – ذخیره یک نکته
-• `/memories` – نمایش همه‌ی یادداشت‌ها
-• `/forget [متن]` – حذف یک یادداشت
-• `/clear_memories` – پاک کردن همه‌ی یادداشت‌ها
-
-🔹 **سایر دستورات:**
-• `/start` – منوی اصلی
-• `/status` – وضعیت مدل‌ها
-• `/help` – این راهنما
-
-💡 فقط سوال خود را بپرسید!
-    """
-    keyboard = [[InlineKeyboardButton("🏠 بازگشت به منو", callback_data="back_to_menu")]]
-    await safe_reply(update.message, help_text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+    """دستور /start – نمایش منوی اصلی با توضیح کامل"""
+    await show_main_menu(update, context)
