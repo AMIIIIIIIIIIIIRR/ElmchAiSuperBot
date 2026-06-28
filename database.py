@@ -9,7 +9,6 @@ async def init_db():
     global db_pool
     db_pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=5)
     async with db_pool.acquire() as conn:
-        # جدول تاریخچه مکالمه
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS chat_history (
                 user_id TEXT,
@@ -18,7 +17,6 @@ async def init_db():
                 timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        # جدول یادداشت‌های بلندمدت
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS user_memories (
                 user_id TEXT,
@@ -26,7 +24,6 @@ async def init_db():
                 timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        # جدول یادآوری‌ها
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS reminders (
                 id SERIAL PRIMARY KEY,
@@ -38,21 +35,18 @@ async def init_db():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        # ایندکس‌ها برای سرعت بیشتر
         await conn.execute("CREATE INDEX IF NOT EXISTS idx_chat_history_user_id ON chat_history(user_id)")
         await conn.execute("CREATE INDEX IF NOT EXISTS idx_user_memories_user_id ON user_memories(user_id)")
         await conn.execute("CREATE INDEX IF NOT EXISTS idx_reminders_user_id ON reminders(user_id)")
         await conn.execute("CREATE INDEX IF NOT EXISTS idx_reminders_remind_at ON reminders(remind_at)")
     print("✅ دیتابیس PostgreSQL آماده است.")
 
-# ===== بستن اتصالات (با پذیرش آرگومان Application) =====
-async def close_db(app: Application = None):  # ← آرگومان اضافه شد
-    """بستن Pool دیتابیس"""
+async def close_db(app: Application = None):
     if db_pool:
         await db_pool.close()
         print("🔒 اتصالات دیتابیس بسته شد.")
 
-# ===== توابع تاریخچه =====
+# ===== تاریخچه =====
 async def save_message(user_id: str, role: str, content: str):
     async with db_pool.acquire() as conn:
         await conn.execute(
@@ -73,7 +67,7 @@ async def clear_history(user_id: str):
     async with db_pool.acquire() as conn:
         await conn.execute("DELETE FROM chat_history WHERE user_id = $1", user_id)
 
-# ===== توابع حافظه‌ی بلندمدت =====
+# ===== حافظه =====
 async def save_memory(user_id: str, memory: str):
     async with db_pool.acquire() as conn:
         await conn.execute(
@@ -100,7 +94,7 @@ async def delete_memory(user_id: str, memory_text: str):
             user_id, memory_text,
         )
 
-# ===== توابع یادآوری =====
+# ===== یادآوری =====
 async def save_reminder(user_id: str, chat_id: str, message: str, remind_at, job_id: str):
     async with db_pool.acquire() as conn:
         return await conn.fetchval(
@@ -114,6 +108,15 @@ async def get_user_reminders(user_id: str):
         rows = await conn.fetch(
             "SELECT id, message, remind_at, job_id FROM reminders WHERE user_id = $1 ORDER BY remind_at ASC",
             user_id
+        )
+    return rows
+
+async def get_all_pending_reminders():
+    """همه‌ی یادآوری‌های ذخیره‌شده — برای reschedule هنگام استارت."""
+    async with db_pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT id, user_id, chat_id, message, remind_at, job_id "
+            "FROM reminders ORDER BY remind_at ASC"
         )
     return rows
 
