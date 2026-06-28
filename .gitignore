@@ -1,0 +1,58 @@
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+env.bak/
+venv.bak/
+*.egg-info/
+dist/
+build/
+*.egg
+
+# ===== Environment variables =====
+.env
+.env.*
+*.env
+.env.local
+.env.production
+
+# ===== IDE =====
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# ===== Railway / Deployment =====
+.railway/
+*.log
+railway-deploy.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ===== Database =====
+*.db
+*.sqlite
+*.sqlite3
+
+# ===== Mise / Version managers =====
+.mise/
+.tool-versions
+
+# ===== Misc =====
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.mypy_cache/
+.dmypy.json
+dmypy.json
