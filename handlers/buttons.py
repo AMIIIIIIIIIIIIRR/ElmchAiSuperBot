@@ -13,6 +13,7 @@ from handlers.ai import status_command
 from handlers.personality import (
     show_personality_menu, personality_set, personality_nsfw_confirm,
 )
+from handlers.websearch import websearch_menu, websearch_callback  # ← جدید
 
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -42,6 +43,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif data == "menu_reminder":
         await show_reminder_menu(update, context, edit=True)
+
+    elif data == "menu_websearch":  # ← جدید
+        await websearch_menu(update, context, edit=True)
 
     elif data == "menu_status":
         await status_command(update, context)
@@ -86,6 +90,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await calendar_handler(update, context)
     elif data.startswith("cal_"):
         await calendar_handler(update, context)
+
+    # ===== جستجوی وب =====
+    elif data in ("websearch_on", "websearch_off"):  # ← جدید
+        await websearch_callback(update, context)
 
     elif data == "refresh_status":
         await status_command(update, context)
