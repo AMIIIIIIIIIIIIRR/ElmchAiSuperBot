@@ -2,7 +2,7 @@ import logging
 from telegram import Update
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, filters,
-    CallbackQueryHandler, ContextTypes  # ← ContextTypes را اضافه کنید
+    CallbackQueryHandler, ContextTypes
 )
 from config import TELEGRAM_TOKEN
 from database import init_db, close_db
@@ -13,8 +13,9 @@ from handlers.memory import (
     handle_memory_text
 )
 from handlers.reminder import (
-    show_reminder_menu, reminder_set, reminder_list,
-    reminder_cancel, reminder_cancel_confirm, handle_reminder_text
+    show_reminder_menu, reminder_new, reminder_list,
+    reminder_cancel, reminder_cancel_confirm, handle_reminder_text,
+    calendar_handler  # اضافه شد
 )
 from handlers.ai import handle_message, status_command
 from handlers.buttons import button_handler
