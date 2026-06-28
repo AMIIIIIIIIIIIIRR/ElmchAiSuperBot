@@ -1,6 +1,9 @@
 import logging
 from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler
+from telegram.ext import (
+    Application, CommandHandler, MessageHandler, filters,
+    CallbackQueryHandler, ContextTypes  # ← ContextTypes را اضافه کنید
+)
 from config import TELEGRAM_TOKEN
 from database import init_db, close_db
 from handlers.base import start_command, help_command
