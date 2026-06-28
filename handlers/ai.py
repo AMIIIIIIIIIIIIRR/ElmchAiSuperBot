@@ -3,7 +3,9 @@ import requests
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from config import FREELLMAPI_KEY, FREELLMAPI_URL, BASE_URL, SHORT_TERM_MEMORY
-from database import save_message, get_recent_history, get_memories
+from database import save_message, get_recent_history, get_memories, get_user_personality
+from personalities import get_personality
+
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
@@ -11,21 +13,28 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_message.startswith("/"):
         return
 
-    processing_msg = await update.message.reply_text("🤔 در حال پردازش...")
+    processing_msg = await update.message.reply_text("🤔 وایسا الان میگم...")
     history = await get_recent_history(user_id, SHORT_TERM_MEMORY)
     memories = await get_memories(user_id)
 
-    system_prompt = f"""
-شما یک دستیار هوشمند و حرفه‌ای هستید که به زبان فارسی پاسخ می‌دهید.
+    # شخصیت انتخاب‌شده کاربر
+    personality_key = await get_user_personality(user_id)
+    personality = get_personality(personality_key)
+    persona_prompt = personality["system_prompt"]
 
-📌 **یادداشت‌های کاربر (اطلاعات مهم):**
-{chr(10).join(f"• {m}" for m in memories) if memories else "هیچ یادداشتی ذخیره نشده است."}
+    memory_block = (
+        "\n".join(f"• {m}" for m in memories) if memories else "هیچ یادداشتی ذخیره نشده است."
+    )
 
-🔹 **قوانین:**
-1. همیشه به فارسی پاسخ دهید.
-2. از یادداشت‌های کاربر در پاسخ‌های خود استفاده کنید.
-3. پاسخ‌ها باید روان، ادبی و مفید باشند.
-"""
+    system_prompt = (
+        f"{persona_prompt}\n\n"
+        f"📌 یادداشت‌های کاربر (اطلاعات مهم درباره خودش):\n{memory_block}\n\n"
+        "🔹 قوانین کلی:\n"
+        "1. همیشه به فارسی پاسخ بده.\n"
+        "2. لحن و سبک گفتار خود را طبق شخصیتی که در بالا تعریف شده حفظ کن.\n"
+        "3. از یادداشت‌های کاربر در پاسخ‌هایت استفاده کن."
+    )
+
     messages = [{"role": "system", "content": system_prompt}]
     for role, content in history:
         messages.append({"role": role, "content": content})
@@ -52,7 +61,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await save_message(user_id, "assistant", ai_reply)
         await processing_msg.delete()
 
-        full_reply = f"{ai_reply}\n\n---\n🤖 مدل: {model_used}"
+        full_reply = (
+            f"{ai_reply}\n\n---\n"
+            f"🎭 شخصیت: {personality['name']}\n"
+            f"🤖 مدل: {model_used}"
+        )
         await update.message.reply_text(full_reply)
     except requests.exceptions.RequestException as e:
         logging.error(f"AI request error: {e}")
@@ -61,11 +74,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logging.exception(f"Unexpected error: {e}")
         await processing_msg.edit_text(f"❌ خطای غیرمنتظره: {str(e)[:100]}")
 
+
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.callback_query:
         await _render_status(update.callback_query.message, edit=True)
     else:
         await _render_status(update.message, edit=False)
+
 
 async def _render_status(message_obj, edit: bool):
     if edit:
@@ -109,9 +124,9 @@ async def _render_status(message_obj, edit: bool):
 
         keyboard = [
             [InlineKeyboardButton("🔄 به‌روزرسانی", callback_data="refresh_status")],
-            [InlineKeyboardButton("🏠 بازگشت به منو", callback_data="back_main")],  # ← تغییر به back_main
+            [InlineKeyboardButton("🏠 بازگشت به منو", callback_data="back_main")],
         ]
         await status_msg.edit_text(reply, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
     except Exception as e:
         logging.error(f"Error fetching models: {e}")
-        await status_msg.edit_text(f"❌ خطا در ارتباط با سرور: {str(e)[:100]}")
+        await status_msg.edit_text(f"❌ خطا: {str(e)[:100]}")
