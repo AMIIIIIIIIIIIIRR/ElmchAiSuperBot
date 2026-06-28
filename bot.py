@@ -1,11 +1,12 @@
 import logging
+from datetime import datetime
 from telegram import Update
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, filters,
     CallbackQueryHandler, ContextTypes
 )
 from config import TELEGRAM_TOKEN
-from database import init_db, close_db
+from database import init_db, close_db, get_all_pending_reminders
 from handlers.base import start_command, help_command
 from handlers.memory import (
     show_memory_menu, memory_save, memory_view, memory_delete,
@@ -15,21 +16,55 @@ from handlers.memory import (
 from handlers.reminder import (
     show_reminder_menu, reminder_new, reminder_list,
     reminder_cancel, reminder_cancel_confirm, handle_reminder_text,
-    calendar_handler
+    calendar_handler, send_reminder
 )
 from handlers.ai import handle_message, status_command
 from handlers.buttons import button_handler
 
 logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-async def post_init(application):
-    # ===== مقداردهی دیتابیس =====
+
+async def reschedule_pending_reminders(application: Application):
+    """پس از هر ری‌استارت، یادآوری‌های ذخیره‌شده در DB را روی JobQueue دوباره شِدول می‌کند."""
+    if application.job_queue is None:
+        logger.error("❌ JobQueue نصب نیست! requirements باید شامل python-telegram-bot[job-queue] باشد.")
+        return
+
+    rows = await get_all_pending_reminders()
+    now = datetime.now()
+    existing_names = {j.name for j in application.job_queue.jobs()}
+    scheduled, fired_now = 0, 0
+
+    for r in rows:
+        job_id = r["job_id"] or f"reminder_{r['user_id']}_{int(r['remind_at'].timestamp())}"
+        if job_id in existing_names:
+            continue
+
+        data = {
+            "reminder_id": r["id"],
+            "user_id": r["user_id"],
+            "chat_id": r["chat_id"],
+            "message": r["message"],
+            "job_id": job_id,
+        }
+
+        delta = r["remind_at"] - now
+        if delta.total_seconds() <= 0:
+            # زمانش گذشته (بات خاموش بوده) → فوراً ارسال شود
+            application.job_queue.run_once(send_reminder, when=0, name=job_id, data=data)
+            fired_now += 1
+        else:
+            application.job_queue.run_once(send_reminder, when=delta, name=job_id, data=data)
+            scheduled += 1
+
+    logger.info(f"🔁 Reschedule: {scheduled} آینده، {fired_now} عقب‌افتاده.")
+
+
+async def post_init(application: Application):
     await init_db()
-    
-    # ===== حذف Webhook برای جلوگیری از Conflict =====
     await application.bot.delete_webhook()
-    
-    # ===== ثبت کامندها =====
+
     commands = [
         ("start", "نمایش منوی اصلی"),
         ("help", "راهنما"),
@@ -37,12 +72,16 @@ async def post_init(application):
     ]
     await application.bot.set_my_commands(commands)
 
+    # بازخوانی و شِدول مجدد یادآوری‌ها (مهم‌ترین تغییر)
+    await reschedule_pending_reminders(application)
+
+
 async def cancel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """لغو عملیات جاری و پاک کردن وضعیت کاربر"""
     context.user_data.pop("waiting_for", None)
     context.user_data.pop("reminder_data", None)
     context.user_data.pop("reminder_step", None)
     await update.message.reply_text("✅ عملیات لغو شد. می‌توانید سوال خود را بپرسید.")
+
 
 def main():
     application = (
@@ -52,6 +91,11 @@ def main():
         .post_shutdown(close_db)
         .build()
     )
+
+    if application.job_queue is None:
+        raise RuntimeError(
+            "JobQueue در دسترس نیست. لطفاً 'python-telegram-bot[job-queue]' را نصب کنید."
+        )
 
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
@@ -71,6 +115,7 @@ def main():
 
     print("🤖 ربات با تقویم شمسی مرحله‌ای و Webhook حذف‌شده روشن شد...")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
+
 
 if __name__ == "__main__":
     main()
