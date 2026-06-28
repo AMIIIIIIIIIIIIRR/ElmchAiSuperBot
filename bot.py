@@ -1,4 +1,5 @@
 import logging
+from telegram import Update  # ← این خط را اضافه کنید
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler
 from config import TELEGRAM_TOKEN
 from database import init_db, close_db
