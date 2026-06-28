@@ -8,7 +8,7 @@ from database import (
     save_message, get_recent_history, get_memories,
     get_web_search_status
 )
-from ddgs import DDGS  # ← تغییر مهم
+from ddgs import DDGS
 
 # ===== تنظیمات جستجو =====
 SEARCH_TIMEOUT = 8
@@ -89,7 +89,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     history = await get_recent_history(user_id, SHORT_TERM_MEMORY)
     memories = await get_memories(user_id)
 
-    # ===== بررسی وضعیت جستجوی وب =====
     web_search_enabled = await get_web_search_status(user_id)
     use_search = False
     search_results = None
@@ -103,7 +102,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             search_footer = "\n\n⚠️ جستجو انجام نشد (عدم دسترسی یا زمان‌بر بودن)."
 
-    # ===== ساخت system_prompt =====
     base_system = """
 شما یک دستیار هوشمند و حرفه‌ای هستید که به زبان فارسی پاسخ می‌دهید.
 
@@ -133,6 +131,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     payload = {"model": "auto", "messages": messages}
 
     try:
+        # ===== درخواست اول =====
         response = requests.post(FREELLMAPI_URL, headers=headers, json=payload, timeout=60)
         response.raise_for_status()
         result = response.json()
@@ -143,6 +142,27 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         ai_reply = choices[0]["message"]["content"]
         model_used = result.get("model", "نامشخص")
+
+        # ===== حلقه: اگر owl-alpha بود، دوباره امتحان کن (حداکثر ۳ بار) =====
+        retry_count = 0
+        while "openrouter/owl-alpha" in model_used and retry_count < 3:
+            logging.warning(f"⚠️ مدل {model_used} شناسایی شد. تلاش مجدد {retry_count + 1}...")
+            await processing_msg.edit_text(f"🔄 مدل نامناسب شناسایی شد، تلاش مجدد... ({retry_count + 1}/3)")
+            
+            response = requests.post(FREELLMAPI_URL, headers=headers, json=payload, timeout=60)
+            response.raise_for_status()
+            result = response.json()
+            choices = result.get("choices") or []
+            if not choices:
+                break
+            ai_reply = choices[0]["message"]["content"]
+            model_used = result.get("model", "نامشخص")
+            retry_count += 1
+
+        if "openrouter/owl-alpha" in model_used:
+            logging.warning(f"⚠️ بعد از ۳ تلاش، همچنان {model_used} است. پاسخ با همان مدل ارسال می‌شود.")
+            search_footer += "\n\n⚠️ مدل مناسب در دسترس نبود، پاسخ با مدل موجود ارسال شد."
+
         await save_message(user_id, "user", user_message)
         await save_message(user_id, "assistant", ai_reply)
         await processing_msg.delete()
