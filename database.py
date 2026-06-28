@@ -35,12 +35,13 @@ async def init_db():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        # ===== جدول جدید: تنظیمات کاربر (شخصیت انتخاب‌شده) =====
+        # ===== جدول تنظیمات کاربر (با فیلد جدید) =====
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS user_settings (
                 user_id TEXT PRIMARY KEY,
                 personality TEXT NOT NULL DEFAULT 'default',
                 nsfw_accepted BOOLEAN NOT NULL DEFAULT FALSE,
+                web_search_enabled BOOLEAN NOT NULL DEFAULT FALSE,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
@@ -113,10 +114,7 @@ async def save_reminder(user_id: str, chat_id: str, message: str, remind_at, job
             user_id, chat_id, message, remind_at, job_id
         )
 
-# ===== توابع مورد نیاز reminder.py (با نام‌های دقیق) =====
-
 async def get_user_reminders(user_id: str):
-    """همان get_reminders با نام متفاوت برای سازگاری با reminder.py"""
     async with db_pool.acquire() as conn:
         return await conn.fetch(
             "SELECT id, message, remind_at, job_id FROM reminders "
@@ -125,7 +123,6 @@ async def get_user_reminders(user_id: str):
         )
 
 async def get_reminder_by_id(reminder_id: int, user_id: str):
-    """دریافت یک یادآوری خاص با id و user_id"""
     async with db_pool.acquire() as conn:
         return await conn.fetchrow(
             "SELECT * FROM reminders WHERE id = $1 AND user_id = $2",
@@ -133,17 +130,13 @@ async def get_reminder_by_id(reminder_id: int, user_id: str):
         )
 
 async def delete_reminder(reminder_id: int, user_id: str = None):
-    """حذف یادآوری با id (user_id فقط برای سازگاری با reminder.py استفاده می‌شود)"""
     async with db_pool.acquire() as conn:
         await conn.execute("DELETE FROM reminders WHERE id = $1", reminder_id)
 
-# ===== تابع قبلی (برای استفاده در جاهای دیگر) =====
 async def get_reminders(user_id: str):
-    """همان get_user_reminders با نام متفاوت (برای جاهایی که از این اسم استفاده می‌کنند)"""
     return await get_user_reminders(user_id)
 
 async def get_all_pending_reminders():
-    """همه‌ی یادآوری‌های ذخیره‌شده در DB را برمی‌گرداند تا پس از ری‌استارت دوباره شِدول شوند."""
     async with db_pool.acquire() as conn:
         return await conn.fetch(
             "SELECT id, user_id, chat_id, message, remind_at, job_id FROM reminders"
@@ -151,7 +144,6 @@ async def get_all_pending_reminders():
 
 # ===== تنظیمات کاربر (شخصیت) =====
 async def get_user_personality(user_id: str) -> str:
-    """شخصیت فعلی کاربر را برمی‌گرداند؛ اگر چیزی ذخیره نشده باشد، 'default'."""
     async with db_pool.acquire() as conn:
         row = await conn.fetchrow(
             "SELECT personality FROM user_settings WHERE user_id = $1", user_id
@@ -159,7 +151,6 @@ async def get_user_personality(user_id: str) -> str:
     return row["personality"] if row else "default"
 
 async def set_user_personality(user_id: str, personality: str):
-    """شخصیت کاربر را ذخیره/به‌روزرسانی می‌کند."""
     async with db_pool.acquire() as conn:
         await conn.execute(
             """
@@ -190,4 +181,25 @@ async def set_nsfw_accepted(user_id: str, accepted: bool):
                           updated_at = CURRENT_TIMESTAMP
             """,
             user_id, accepted,
+        )
+
+# ===== جستجوی وب (جدید) =====
+async def get_web_search_status(user_id: str) -> bool:
+    async with db_pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT web_search_enabled FROM user_settings WHERE user_id = $1", user_id
+        )
+    return bool(row["web_search_enabled"]) if row else False
+
+async def set_web_search_status(user_id: str, enabled: bool):
+    async with db_pool.acquire() as conn:
+        await conn.execute(
+            """
+            INSERT INTO user_settings (user_id, web_search_enabled, updated_at)
+            VALUES ($1, $2, CURRENT_TIMESTAMP)
+            ON CONFLICT (user_id)
+            DO UPDATE SET web_search_enabled = EXCLUDED.web_search_enabled,
+                          updated_at = CURRENT_TIMESTAMP
+            """,
+            user_id, enabled,
         )
