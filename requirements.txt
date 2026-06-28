@@ -4,4 +4,4 @@ python-telegram-bot[job-queue]>=21.0,<22
 requests>=2.31
 asyncpg>=0.29
 jdatetime>=4.1.1
-duckduckgo-search>=6.3.0   
+ddgs>=9.0.0
