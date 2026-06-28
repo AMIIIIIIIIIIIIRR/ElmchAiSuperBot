@@ -11,11 +11,9 @@ TELEGRAM_TOKEN = os.getenv("BOT_TOKEN")
 FREELLMAPI_KEY = os.getenv("FREELLMAPI_KEY")
 FREELLMAPI_URL = os.getenv("FREELLMAPI_URL")
 DATABASE_URL = os.getenv("DATABASE_URL")
-PORT = int(os.getenv("PORT", 8443))
-WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 
-if not all([TELEGRAM_TOKEN, FREELLMAPI_KEY, FREELLMAPI_URL, DATABASE_URL, WEBHOOK_URL]):
-    raise ValueError("BOT_TOKEN, FREELLMAPI_KEY, FREELLMAPI_URL, DATABASE_URL and WEBHOOK_URL must be set")
+if not all([TELEGRAM_TOKEN, FREELLMAPI_KEY, FREELLMAPI_URL, DATABASE_URL]):
+    raise ValueError("BOT_TOKEN, FREELLMAPI_KEY, FREELLMAPI_URL and DATABASE_URL must be set")
 
 BASE_URL = FREELLMAPI_URL.replace("/v1/chat/completions", "")
 SHORT_TERM_MEMORY = 5
@@ -351,18 +349,8 @@ async def main():
     
     print("🤖 ربات با حافظه‌ی ترکیبی (۵ پیام + یادداشت‌ها) روشن شد...")
     
-    await application.bot.delete_webhook()
-    await application.bot.set_webhook(WEBHOOK_URL)
-    
-    await application.run_webhook(
-        listen="0.0.0.0",
-        port=PORT,
-        url_path="webhook",
-        webhook_url=WEBHOOK_URL,
-        close_loop=False
-    )
+    # ===== Polling با close_loop=False =====
+    await application.run_polling(close_loop=False)
 
-# ===== اجرا با loop.run_until_complete (نه asyncio.run) =====
 if __name__ == "__main__":
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(main())
+    asyncio.run(main())
