@@ -23,7 +23,13 @@ from handlers.buttons import button_handler
 logging.basicConfig(level=logging.INFO)
 
 async def post_init(application):
+    # ===== مقداردهی دیتابیس =====
     await init_db()
+    
+    # ===== حذف Webhook برای جلوگیری از Conflict =====
+    await application.bot.delete_webhook()
+    
+    # ===== ثبت کامندها =====
     commands = [
         ("start", "نمایش منوی اصلی"),
         ("help", "راهنما"),
@@ -54,16 +60,7 @@ def main():
 
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler))
 
-    print("🤖 ربات با تقویم شمسی مرحله‌ای روشن شد...")
-    
-    # ===== حذف صریح Webhook قبل از شروع Polling =====
-    import asyncio
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(application.bot.delete_webhook())
-    loop.close()
-    # ===== پایان بخش حذف Webhook =====
-
+    print("🤖 ربات با تقویم شمسی مرحله‌ای و Webhook حذف‌شده روشن شد...")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
