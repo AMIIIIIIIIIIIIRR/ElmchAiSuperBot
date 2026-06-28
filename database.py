@@ -9,6 +9,7 @@ async def init_db():
     global db_pool
     db_pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=5)
     async with db_pool.acquire() as conn:
+        # ===== جدول تاریخچه مکالمه =====
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS chat_history (
                 user_id TEXT,
@@ -17,6 +18,8 @@ async def init_db():
                 timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        
+        # ===== جدول یادداشت‌های بلندمدت =====
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS user_memories (
                 user_id TEXT,
@@ -24,6 +27,8 @@ async def init_db():
                 timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        
+        # ===== جدول یادآوری‌ها =====
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS reminders (
                 id SERIAL PRIMARY KEY,
@@ -35,7 +40,8 @@ async def init_db():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        # ===== جدول تنظیمات کاربر (با فیلد جدید) =====
+        
+        # ===== جدول تنظیمات کاربر =====
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS user_settings (
                 user_id TEXT PRIMARY KEY,
@@ -46,10 +52,17 @@ async def init_db():
             )
         """)
 
+        # ===== اضافه کردن ستون در صورت عدم وجود (برای دیتابیس‌های قدیمی) =====
+        await conn.execute("""
+            ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS web_search_enabled BOOLEAN NOT NULL DEFAULT FALSE
+        """)
+
+        # ===== ایندکس‌ها =====
         await conn.execute("CREATE INDEX IF NOT EXISTS idx_chat_history_user_id ON chat_history(user_id)")
         await conn.execute("CREATE INDEX IF NOT EXISTS idx_user_memories_user_id ON user_memories(user_id)")
         await conn.execute("CREATE INDEX IF NOT EXISTS idx_reminders_user_id ON reminders(user_id)")
         await conn.execute("CREATE INDEX IF NOT EXISTS idx_reminders_remind_at ON reminders(remind_at)")
+    
     print("✅ دیتابیس PostgreSQL آماده است.")
 
 async def close_db(app: Application = None):
@@ -57,7 +70,10 @@ async def close_db(app: Application = None):
         await db_pool.close()
         print("🔒 اتصالات دیتابیس بسته شد.")
 
-# ===== تاریخچه =====
+# ============================================================
+# ===== تاریخچه مکالمه =====
+# ============================================================
+
 async def save_message(user_id: str, role: str, content: str):
     async with db_pool.acquire() as conn:
         await conn.execute(
@@ -78,7 +94,10 @@ async def clear_history(user_id: str):
     async with db_pool.acquire() as conn:
         await conn.execute("DELETE FROM chat_history WHERE user_id = $1", user_id)
 
-# ===== حافظه =====
+# ============================================================
+# ===== حافظه بلندمدت (یادداشت‌ها) =====
+# ============================================================
+
 async def save_memory(user_id: str, memory: str):
     async with db_pool.acquire() as conn:
         await conn.execute(
@@ -105,7 +124,10 @@ async def delete_memory(user_id: str, memory_text: str):
             user_id, memory_text,
         )
 
-# ===== یادآوری =====
+# ============================================================
+# ===== یادآوری‌ها =====
+# ============================================================
+
 async def save_reminder(user_id: str, chat_id: str, message: str, remind_at, job_id: str):
     async with db_pool.acquire() as conn:
         return await conn.fetchval(
@@ -142,7 +164,10 @@ async def get_all_pending_reminders():
             "SELECT id, user_id, chat_id, message, remind_at, job_id FROM reminders"
         )
 
-# ===== تنظیمات کاربر (شخصیت) =====
+# ============================================================
+# ===== تنظیمات کاربر (شخصیت و جستجوی وب) =====
+# ============================================================
+
 async def get_user_personality(user_id: str) -> str:
     async with db_pool.acquire() as conn:
         row = await conn.fetchrow(
@@ -183,7 +208,10 @@ async def set_nsfw_accepted(user_id: str, accepted: bool):
             user_id, accepted,
         )
 
-# ===== جستجوی وب (جدید) =====
+# ============================================================
+# ===== جستجوی وب =====
+# ============================================================
+
 async def get_web_search_status(user_id: str) -> bool:
     async with db_pool.acquire() as conn:
         row = await conn.fetchrow(
