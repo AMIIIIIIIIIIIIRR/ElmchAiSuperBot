@@ -60,7 +60,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await memory_clear_confirm(update, context)
 
     # ===== منوی یادآوری =====
-    elif data == "reminder_new":  # ← تغییر از reminder_set به reminder_new
+    elif data == "reminder_new":
         await reminder_new(update, context)
     elif data == "reminder_list":
         await reminder_list(update, context)
@@ -68,5 +68,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await reminder_cancel(update, context)
     elif data.startswith("cancel_rem_"):
         await reminder_cancel_confirm(update, context)
-    elif data.startswith("cal_"):  # ← دکمه‌های تقویم
+    elif data.startswith("rem_"):  # دکمه‌های تقویم (سال، ماه، روز، ساعت، دقیقه)
+        await calendar_handler(update, context)
+    elif data.startswith("cal_"):  # برای سازگاری با نسخه‌های قبلی
         await calendar_handler(update, context)
