@@ -6,6 +6,8 @@ from utils.helpers import safe_reply
 MAIN_MENU = [
     [InlineKeyboardButton("🤖 هوش مصنوعی", callback_data="menu_ai")],
     [InlineKeyboardButton("🎭 شخصیت", callback_data="menu_personality")],
+    [InlineKeyboardButton("🖼 تحلیل عکس/فایل", callback_data="menu_media")],
+    [InlineKeyboardButton("🎨 ساخت عکس", callback_data="menu_imagegen")],
     [InlineKeyboardButton("🧠 حافظه", callback_data="menu_memory")],
     [InlineKeyboardButton("⏰ یادآوری", callback_data="menu_reminder")],
     [InlineKeyboardButton("🌐 جستجوی اینترنت", callback_data="menu_websearch")],
@@ -28,6 +30,8 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, edi
 | :--- | :--- |
 | 🤖 **هوش مصنوعی** | سوالات خود را بپرسید و پاسخ بگیرید |
 | 🎭 **شخصیت** | لحن ربات را عوض کن (ادبی، کول، رکیک ۱۸+، جدی) |
+| 🖼 **تحلیل عکس/فایل** | عکس یا فایل (PDF, DOCX, متن) بفرست تا تحلیل کنم |
+| 🎨 **ساخت عکس** | با /image یا این دکمه عکس بساز |
 | 🧠 **حافظه** | نکات مهم را ذخیره و بازیابی کنید |
 | ⏰ **یادآوری** | یادآوری‌ها را تنظیم کنید |
 | 🌐 **جستجوی اینترنت** | روشن/خاموش کردن جستجوی خودکار اینترنت |
@@ -36,8 +40,7 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, edi
 
 ---
 
-💡 شخصیت انتخاب‌شده تا وقتی خودت عوضش نکنی ثابت می‌مونه.
-
+💡 برای تحلیل، کافیه عکس یا فایل رو همینجا بفرستی (caption = سوال شما).
 📌 **نکته:** اگر یک لینک ارسال کنید، به‌طور خودکار خلاصه می‌شود!
 """
     reply_markup = InlineKeyboardMarkup(MAIN_MENU)
