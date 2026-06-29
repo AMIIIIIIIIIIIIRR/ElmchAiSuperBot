@@ -10,6 +10,7 @@ MAIN_MENU = [
     [InlineKeyboardButton("⏰ یادآوری", callback_data="menu_reminder")],
     [InlineKeyboardButton("🌐 جستجوی اینترنت", callback_data="menu_websearch")],
     [InlineKeyboardButton("📊 اطلاعات مالی", callback_data="menu_market")],
+    [InlineKeyboardButton("📝 خلاصه‌سازی", callback_data="menu_summarize")],  # ← جدید
     [InlineKeyboardButton("📊 وضعیت مدل‌ها", callback_data="menu_status")],
     [InlineKeyboardButton("❓ راهنما", callback_data="menu_help")],
 ]
@@ -32,6 +33,7 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, edi
 | ⏰ **یادآوری** | یادآوری‌ها را تنظیم کنید |
 | 🌐 **جستجوی اینترنت** | روشن/خاموش کردن جستجوی خودکار اینترنت |
 | 📊 **اطلاعات مالی** | قیمت طلا، دلار و تاریخ امروز |
+| 📝 **خلاصه‌سازی** | خلاصه‌سازی لینک یا متن طولانی |
 | 📊 **وضعیت** | وضعیت مدل‌های هوش مصنوعی را ببینید |
 
 ---
