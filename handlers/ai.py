@@ -6,8 +6,9 @@ from telegram.ext import ContextTypes
 from config import FREELLMAPI_KEY, FREELLMAPI_URL, BASE_URL, SHORT_TERM_MEMORY
 from database import (
     save_message, get_recent_history, get_memories,
-    get_web_search_status
+    get_web_search_status, get_user_personality  # ← اضافه شد
 )
+from personalities import get_personality  # ← اضافه شد
 from ddgs import DDGS
 
 # ===== تنظیمات جستجو =====
@@ -110,6 +111,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     history = await get_recent_history(user_id, SHORT_TERM_MEMORY)
     memories = await get_memories(user_id)
 
+    # ===== دریافت شخصیت کاربر =====
+    personality_name = await get_user_personality(user_id)
+    personality_prompt = get_personality(personality_name)
+
     web_search_enabled = await get_web_search_status(user_id)
 
     # ===== تشخیص نیاز به جستجو =====
@@ -125,12 +130,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             search_footer = "\n\n⚠️ جستجو انجام نشد (عدم دسترسی یا زمان‌بر بودن)."
 
-    # ===== ساخت system_prompt =====
-    base_system = """
-شما یک دستیار هوشمند و حرفه‌ای هستید که به زبان فارسی پاسخ می‌دهید.
+    # ===== ساخت system_prompt با شخصیت =====
+    base_system = f"""
+{personality_prompt}
 
 📌 **یادداشت‌های کاربر (اطلاعات مهم):**
-{memories}
+{chr(10).join(f"• {m}" for m in memories) if memories else "هیچ یادداشتی ذخیره نشده است."}
 
 🔹 **قوانین:**
 1. همیشه به فارسی پاسخ دهید.
@@ -140,11 +145,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if use_search and search_results:
         search_context = build_search_context(user_message, search_results)
-        system_prompt = base_system.format(memories="\n".join(f"• {m}" for m in memories) if memories else "هیچ یادداشتی ذخیره نشده است.")
+        system_prompt = base_system
         system_prompt += f"\n\n🔍 **اطلاعات به‌روز از جستجوی وب:**\n{search_context}"
         system_prompt += "\n\nلطفاً بر اساس اطلاعات بالا و دانش خود، پاسخی جامع و مفید به کاربر بدهید. در صورت استفاده از اطلاعات جستجو، حتماً به منابع اشاره کنید."
     else:
-        system_prompt = base_system.format(memories="\n".join(f"• {m}" for m in memories) if memories else "هیچ یادداشتی ذخیره نشده است.")
+        system_prompt = base_system
 
     messages = [{"role": "system", "content": system_prompt}]
     for role, content in history:
