@@ -1,21 +1,23 @@
 import logging
 import requests
 import asyncio
+import re
 from telegram import Update
 from telegram.ext import ContextTypes
 from config import FREELLMAPI_KEY, FREELLMAPI_URL, BASE_URL, SHORT_TERM_MEMORY
 from database import (
     save_message, get_recent_history, get_memories,
-    get_web_search_status, get_user_personality  # ← اضافه شد
+    get_web_search_status, get_user_personality
 )
-from personalities import get_personality  # ← اضافه شد
+from personalities import get_personality
 from ddgs import DDGS
+from handlers.summarize import extract_url_content, get_summary
 
 # ===== تنظیمات جستجو =====
 SEARCH_TIMEOUT = 8
 MAX_SEARCH_RESULTS = 3
 
-# ===== مدل‌های مجاز برای جستجوی اینترنت (به‌ترتیب اولویت) =====
+# ===== مدل‌های مجاز برای جستجوی اینترنت =====
 SEARCH_ALLOWED_MODELS = [
     "gemini-2.5-flash",
     "gemini-2.5-flash-lite",
@@ -106,18 +108,31 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_message.startswith('/'):
         return
 
+    # ===== تشخیص خودکار لینک =====
+    url_pattern = r'https?://[^\s]+'
+    urls = re.findall(url_pattern, user_message)
+    
+    if urls:
+        await update.message.reply_text("⏳ در حال دریافت و خلاصه‌سازی لینک... لطفاً صبر کنید.")
+        content = await extract_url_content(urls[0])
+        if content:
+            summary = await get_summary(content)
+            await update.message.reply_text(f"📝 **خلاصه لینک:**\n\n{summary}")
+        else:
+            await update.message.reply_text("❌ خطا در دریافت محتوای لینک. لطفاً لینک را بررسی کنید.")
+        return
+
+    # ===== ادامه مسیر عادی =====
     processing_msg = await update.message.reply_text("🤔 در حال پردازش...")
 
     history = await get_recent_history(user_id, SHORT_TERM_MEMORY)
     memories = await get_memories(user_id)
 
-    # ===== دریافت شخصیت کاربر =====
     personality_name = await get_user_personality(user_id)
     personality_prompt = get_personality(personality_name)
 
     web_search_enabled = await get_web_search_status(user_id)
 
-    # ===== تشخیص نیاز به جستجو =====
     use_search = web_search_enabled and needs_search(user_message)
     search_results = None
     search_footer = ""
@@ -130,7 +145,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             search_footer = "\n\n⚠️ جستجو انجام نشد (عدم دسترسی یا زمان‌بر بودن)."
 
-    # ===== ساخت system_prompt با شخصیت =====
     base_system = f"""
 {personality_prompt}
 
@@ -158,7 +172,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     headers = {"Authorization": f"Bearer {FREELLMAPI_KEY}", "Content-Type": "application/json"}
 
-    # ===== انتخاب مدل با Fallback =====
     if use_search and search_results:
         selected_model = None
         last_error = None
@@ -188,7 +201,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             selected_model = "auto"
             logging.warning(f"⚠️ همه مدل‌های مجاز شکست خوردند. آخرین خطا: {last_error}. Fallback به auto.")
 
-        # ===== ارسال درخواست نهایی =====
         payload = {"model": selected_model, "messages": messages}
         try:
             response = requests.post(FREELLMAPI_URL, headers=headers, json=payload, timeout=60)
@@ -214,7 +226,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
     else:
-        # ===== اگر جستجو فعال نیست، از auto استفاده کن =====
         payload = {"model": "auto", "messages": messages}
         try:
             response = requests.post(FREELLMAPI_URL, headers=headers, json=payload, timeout=60)
