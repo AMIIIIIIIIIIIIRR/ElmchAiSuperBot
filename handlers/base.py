@@ -8,7 +8,8 @@ MAIN_MENU = [
     [InlineKeyboardButton("🎭 شخصیت", callback_data="menu_personality")],
     [InlineKeyboardButton("🧠 حافظه", callback_data="menu_memory")],
     [InlineKeyboardButton("⏰ یادآوری", callback_data="menu_reminder")],
-    [InlineKeyboardButton("🌐 جستجوی اینترنت", callback_data="menu_websearch")],  # ← اضافه شد
+    [InlineKeyboardButton("🌐 جستجوی اینترنت", callback_data="menu_websearch")],
+    [InlineKeyboardButton("📊 اطلاعات مالی", callback_data="menu_market")],
     [InlineKeyboardButton("📊 وضعیت مدل‌ها", callback_data="menu_status")],
     [InlineKeyboardButton("❓ راهنما", callback_data="menu_help")],
 ]
