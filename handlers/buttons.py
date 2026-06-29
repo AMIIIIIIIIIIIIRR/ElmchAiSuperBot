@@ -1,4 +1,4 @@
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from handlers.base import show_main_menu, help_command
 from handlers.memory import (
@@ -13,7 +13,8 @@ from handlers.ai import status_command
 from handlers.personality import (
     show_personality_menu, personality_set, personality_nsfw_confirm,
 )
-from handlers.websearch import websearch_menu, websearch_callback  # ← جدید
+from handlers.websearch import websearch_menu, websearch_callback
+from handlers.market import get_gold_price, get_usd_price, get_today_date
 
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -44,9 +45,44 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "menu_reminder":
         await show_reminder_menu(update, context, edit=True)
 
-    elif data == "menu_websearch":  # ← جدید
+    elif data == "menu_websearch":
         await websearch_menu(update, context, edit=True)
 
+    # ===== منوی اطلاعات مالی =====
+    elif data == "menu_market":
+        keyboard = [
+            [InlineKeyboardButton("💰 قیمت طلا", callback_data="market_gold")],
+            [InlineKeyboardButton("💵 قیمت دلار/ارز", callback_data="market_usd")],
+            [InlineKeyboardButton("📅 تاریخ امروز", callback_data="market_date")],
+            [InlineKeyboardButton("🔙 بازگشت به منوی اصلی", callback_data="back_main")],
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(
+            "📊 **اطلاعات مالی و تاریخ**\n\n"
+            "یکی از گزینه‌های زیر را انتخاب کنید:",
+            parse_mode="Markdown",
+            reply_markup=reply_markup
+        )
+
+    elif data == "market_gold":
+        reply = get_gold_price()
+        keyboard = [[InlineKeyboardButton("🔙 بازگشت", callback_data="menu_market")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(reply, parse_mode="Markdown", reply_markup=reply_markup)
+
+    elif data == "market_usd":
+        reply = get_usd_price()
+        keyboard = [[InlineKeyboardButton("🔙 بازگشت", callback_data="menu_market")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(reply, parse_mode="Markdown", reply_markup=reply_markup)
+
+    elif data == "market_date":
+        reply = get_today_date()
+        keyboard = [[InlineKeyboardButton("🔙 بازگشت", callback_data="menu_market")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(reply, parse_mode="Markdown", reply_markup=reply_markup)
+
+    # ===== سایر منوها =====
     elif data == "menu_status":
         await status_command(update, context)
 
@@ -92,7 +128,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await calendar_handler(update, context)
 
     # ===== جستجوی وب =====
-    elif data in ("websearch_on", "websearch_off"):  # ← جدید
+    elif data in ("websearch_on", "websearch_off"):
         await websearch_callback(update, context)
 
     elif data == "refresh_status":
