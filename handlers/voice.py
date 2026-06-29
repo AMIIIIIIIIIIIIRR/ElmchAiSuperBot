@@ -4,11 +4,7 @@ import os
 from telegram import Update
 from telegram.ext import ContextTypes
 
-# ===== آدرس Speaches =====
-# اگر Speaches و ربات در یک پروژه هستن، از آدرس داخلی استفاده کن
-# SPEACHES_URL = "http://speaches.railway.internal:8000/v1/audio/transcriptions"
-# اگر در دو پروژه جدا هستن، از آدرس عمومی استفاده کن:
-SPEACHES_URL = "https://your-app.up.railway.app/v1/audio/transcriptions"
+SPEACHES_URL = os.getenv("SPEACHES_URL")
 
 async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """دریافت پیام صوتی و ارسال به Speaches برای تشخیص گفتار"""
