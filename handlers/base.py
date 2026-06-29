@@ -51,7 +51,9 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, edi
         await safe_reply(update.message, text, parse_mode="Markdown", reply_markup=reply_markup)
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await show_main_menu(update, context)
+    # ممکنه از /start (message) یا از دکمه کال‌بک صدا زده بشه
+    await show_main_menu(update, context, edit=bool(update.callback_query))
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await show_main_menu(update, context)
+    # ممکنه از /help (message) یا از دکمه «راهنما» (callback) صدا زده بشه
+    await show_main_menu(update, context, edit=bool(update.callback_query))
