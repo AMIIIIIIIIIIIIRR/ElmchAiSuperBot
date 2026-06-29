@@ -5,6 +5,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 SPEACHES_URL = os.getenv("SPEACHES_URL")
+SPEACHES_API_KEY = os.getenv("SPEACHES_API_KEY")
 
 async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """دریافت پیام صوتی و ارسال به Speaches برای تشخیص گفتار"""
@@ -17,6 +18,11 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # ارسال پیام به کاربر
         status_msg = await update.message.reply_text("🎤 در حال تشخیص گفتار... لطفاً صبر کنید.")
 
+        # ===== هدر Authorization =====
+        headers = {}
+        if SPEACHES_API_KEY:
+            headers["Authorization"] = f"Bearer {SPEACHES_API_KEY}"
+
         # ===== ارسال به Speaches =====
         with open(file_path, "rb") as f:
             files = {"file": (file_path, f, "audio/ogg")}
@@ -28,6 +34,7 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 SPEACHES_URL,
                 files=files,
                 data=data,
+                headers=headers,
                 timeout=60
             )
 
@@ -42,12 +49,6 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             if transcribed_text:
                 await status_msg.edit_text(f"📝 **متن تشخیص‌داده‌شده:**\n\n{transcribed_text}")
-
-                # ===== (اختیاری) ارسال متن به هوش مصنوعی برای دریافت پاسخ =====
-                # از اینجا می‌تونی متن رو به تابع handle_message بفرستی
-                # تا کاربر جواب بگیره
-                # await handle_message(update, context, transcribed_text)
-
             else:
                 await status_msg.edit_text("❌ صدایی تشخیص داده نشد. لطفاً واضح‌تر صحبت کنید.")
         else:
