@@ -2,50 +2,6 @@ import logging
 import requests
 from bs4 import BeautifulSoup
 import html2text
-from telegram import Update
-from telegram.ext import ContextTypes
-
-async def summarize_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """دستور /summarize - خلاصه‌سازی لینک یا متن"""
-    text = " ".join(context.args)
-    
-    if not text:
-        await update.message.reply_text(
-            "📝 **راهنمای خلاصه‌سازی**\n\n"
-            "• برای خلاصه‌سازی یک لینک:\n"
-            "  `/summarize https://example.com`\n\n"
-            "• برای خلاصه‌سازی یک متن:\n"
-            "  `/summarize متن طولانی ...`\n\n"
-            "💡 می‌توانید لینک یا متن را به‌صورت مستقیم نیز ارسال کنید."
-        )
-        return
-    
-    status_msg = await update.message.reply_text("⏳ در حال پردازش...")
-    
-    try:
-        # تشخیص لینک
-        if text.startswith("http://") or text.startswith("https://"):
-            content = await extract_url_content(text)
-            if not content:
-                await status_msg.edit_text("❌ خطا در دریافت محتوای لینک. لطفاً لینک را بررسی کنید.")
-                return
-            source = "لینک"
-        else:
-            content = text
-            source = "متن"
-        
-        # خلاصه‌سازی با FreeLLMAPI
-        summary = await get_summary(content)
-        
-        await status_msg.delete()
-        await update.message.reply_text(
-            f"📝 **خلاصه‌سازی {source}:**\n\n{summary}",
-            parse_mode="Markdown"
-        )
-        
-    except Exception as e:
-        logging.error(f"Summarize error: {e}")
-        await status_msg.edit_text("❌ خطا در خلاصه‌سازی. لطفاً دوباره تلاش کنید.")
 
 async def extract_url_content(url: str) -> str:
     """استخراج متن از لینک"""
