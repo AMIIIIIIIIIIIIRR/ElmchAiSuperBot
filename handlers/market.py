@@ -8,36 +8,43 @@ import os
 NERKH_API_KEY = os.getenv("NERKH_API_KEY", "YOUR_API_KEY_HERE")
 NERKH_API_URL = "https://api.nerkh.io/v1/prices/json/all"
 
+# ===== نام‌های فارسی برای انواع طلا =====
+GOLD_LABELS = {
+    "GOLD18K": "طلای ۱۸ عیار",
+    "GOLD24K": "طلای ۲۴ عیار",
+    "SEKE_EMAMI": "سکه امامی",
+    "SEKE_BAHAR": "سکه تمام بهار",
+    "OUNCE": "انس طلا",
+    "MAZANEH": "مظنه طلا",
+    "SEKE_NIM": "سکه نیم",
+    "SEKE_ROB": "سکه ربع",
+    "SEKE_1G": "سکه ۱ گرمی",
+}
+
 def get_gold_price() -> str:
-    """دریافت قیمت لحظه‌ای انواع طلا از nerkh.io"""
+    """دریافت قیمت لحظه‌ای انواع طلا از nerkh.io با نام‌های فارسی"""
     try:
         params = {"x-api-key": NERKH_API_KEY}
         response = requests.get(NERKH_API_URL, params=params, timeout=10)
         
         if response.status_code == 200:
             data = response.json()
-            
-            # ===== ساختار واقعی پاسخ =====
-            # data -> data -> gold -> GOLD18K, GOLD24K, ...
-            inner_data = data.get("data", {})
-            gold_data = inner_data.get("gold", {})
+            gold_data = data.get("data", {}).get("gold", {})
             
             if not gold_data:
                 return "⚠️ اطلاعات طلا در دسترس نیست."
             
-            # انواع طلاهای موجود
-            gold_types = ["GOLD18K", "GOLD24K", "SEKE_EMAMI", "SEKE_BAHAR", "OUNCE"]
             result = "💰 **قیمت طلا:**\n"
             found = False
             
-            for gold_type in gold_types:
-                if gold_type in gold_data:
+            for gold_key, label in GOLD_LABELS.items():
+                if gold_key in gold_data:
                     found = True
-                    item = gold_data[gold_type]
+                    item = gold_data[gold_key]
                     price = item.get("current", "نامشخص")
                     update_time = item.get("update", "")
                     
-                    # تبدیل قیمت به عدد با جداکننده هزارگان
+                    # فرمت قیمت با جداکننده هزارگان
                     if price != "نامشخص" and isinstance(price, (int, float, str)):
                         try:
                             price_int = int(price)
@@ -45,7 +52,7 @@ def get_gold_price() -> str:
                         except:
                             pass
                     
-                    result += f"• {gold_type}: {price} تومان"
+                    result += f"• {label}: {price} تومان"
                     if update_time:
                         result += f" (🕐 {update_time})"
                     result += "\n"
@@ -67,11 +74,7 @@ def get_usd_price() -> str:
         
         if response.status_code == 200:
             data = response.json()
-            
-            # ===== ساختار واقعی پاسخ =====
-            inner_data = data.get("data", {})
-            currency_data = inner_data.get("currency", {})
-            usd_data = currency_data.get("USD", {})
+            usd_data = data.get("data", {}).get("currency", {}).get("USD", {})
             
             if not usd_data:
                 return "⚠️ اطلاعات دلار در دسترس نیست."
@@ -79,7 +82,6 @@ def get_usd_price() -> str:
             price = usd_data.get("current", "نامشخص")
             update_time = usd_data.get("update", "")
             
-            # تبدیل قیمت به عدد با جداکننده هزارگان
             if price != "نامشخص" and isinstance(price, (int, float, str)):
                 try:
                     price_int = int(price)
