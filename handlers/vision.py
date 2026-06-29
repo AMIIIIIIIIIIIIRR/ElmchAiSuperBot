@@ -6,7 +6,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 from config import FREELLMAPI_KEY, FREELLMAPI_URL, SHORT_TERM_MEMORY
 from database import save_message, get_recent_history, get_user_personality
-from personalities import get_personality
+from personalities import get_system_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +80,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     b64 = base64.b64encode(img_bytes).decode("ascii")
     data_url = f"data:image/jpeg;base64,{b64}"
 
-    personality_prompt = get_personality(await get_user_personality(user_id))
+    personality_prompt = get_system_prompt(await get_user_personality(user_id))
     system_prompt = (
         f"{personality_prompt}\n\n"
         "تو یک تحلیل‌گر تصویر هستی. همیشه فارسی پاسخ بده و در توصیف عکس دقیق و کامل باش."
