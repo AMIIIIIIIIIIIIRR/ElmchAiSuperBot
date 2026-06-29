@@ -22,6 +22,9 @@ from handlers.ai import handle_message, status_command
 from handlers.buttons import button_handler
 from handlers.personality import personality_command
 from handlers.websearch import websearch_command
+from handlers.vision import handle_photo
+from handlers.files import handle_document
+from handlers.imagegen import image_command, handle_pending_image_prompt
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -69,6 +72,7 @@ async def post_init(application: Application):
         ("start", "نمایش منوی اصلی"),
         ("help", "راهنما"),
         ("personality", "تغییر شخصیت ربات"),
+        ("image", "ساخت عکس با هوش مصنوعی"),
         ("cancel", "لغو عملیات جاری"),
         ("websearch", "روشن/خاموش جستجوی اینترنت"),
     ]
@@ -80,6 +84,7 @@ async def cancel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.pop("waiting_for", None)
     context.user_data.pop("reminder_data", None)
     context.user_data.pop("reminder_step", None)
+    context.user_data.pop("awaiting_image_prompt", None)
     await update.message.reply_text("✅ عملیات لغو شد. می‌توانید سوال خود را بپرسید.")
 
 
@@ -102,9 +107,18 @@ def main():
     application.add_handler(CommandHandler("cancel", cancel_command))
     application.add_handler(CommandHandler("personality", personality_command))
     application.add_handler(CommandHandler("websearch", websearch_command))
+    application.add_handler(CommandHandler("image", image_command))
     application.add_handler(CallbackQueryHandler(button_handler))
 
+    # عکس و فایل
+    application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
+    application.add_handler(MessageHandler(filters.Document.ALL, handle_document))
+
     async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        # اگر کاربر منتظر prompt برای ساخت عکس است
+        if await handle_pending_image_prompt(update, context):
+            return
+
         waiting_for = context.user_data.get("waiting_for")
         if waiting_for == "reminder_text":
             await handle_reminder_text(update, context)
@@ -115,7 +129,7 @@ def main():
 
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler))
 
-    print("🤖 ربات با تشخیص خودکار لینک، شخصیت‌ها و جستجوی اینترنت روشن شد...")
+    print("🤖 ربات با تحلیل عکس/فایل و تولید تصویر روشن شد...")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
