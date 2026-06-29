@@ -25,6 +25,7 @@ from handlers.websearch import websearch_command
 from handlers.vision import handle_photo
 from handlers.files import handle_document
 from handlers.imagegen import image_command, handle_pending_image_prompt
+from handlers.voice import handle_voice
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -109,10 +110,9 @@ def main():
     application.add_handler(CommandHandler("websearch", websearch_command))
     application.add_handler(CommandHandler("image", image_command))
     application.add_handler(CallbackQueryHandler(button_handler))
-
-    # عکس و فایل
     application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     application.add_handler(MessageHandler(filters.Document.ALL, handle_document))
+    application.add_handler(MessageHandler(filters.VOICE, handle_voice))
 
     async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # اگر کاربر منتظر prompt برای ساخت عکس است
