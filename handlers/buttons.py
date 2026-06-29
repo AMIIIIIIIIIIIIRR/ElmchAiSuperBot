@@ -15,7 +15,6 @@ from handlers.personality import (
 )
 from handlers.websearch import websearch_menu, websearch_callback
 from handlers.market import get_gold_price, get_usd_price, get_today_date
-from handlers.summarize import summarize_command  # ← اضافه شد
 
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -49,7 +48,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "menu_websearch":
         await websearch_menu(update, context, edit=True)
 
-    # ===== منوی اطلاعات مالی =====
     elif data == "menu_market":
         keyboard = [
             [InlineKeyboardButton("💰 قیمت طلا", callback_data="market_gold")],
@@ -83,24 +81,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(reply, parse_mode="Markdown", reply_markup=reply_markup)
 
-    # ===== منوی خلاصه‌سازی (جدید) =====
-    elif data == "menu_summarize":
-        await query.edit_message_text(
-            "📝 **خلاصه‌سازی لینک یا متن**\n\n"
-            "🔹 برای خلاصه‌سازی یک **لینک**:\n"
-            "  `/summarize https://example.com`\n\n"
-            "🔹 برای خلاصه‌سازی یک **متن طولانی**:\n"
-            "  `/summarize متن طولانی ...`\n\n"
-            "💡 همچنین می‌توانید لینک یا متن را مستقیم بفرستید.\n\n"
-            "📌 **مثال:**\n"
-            "`/summarize https://fa.wikipedia.org/wiki/هوش_مصنوعی`\n\n"
-            "🔙 برای بازگشت، دکمه‌ی زیر را بزنید.",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔙 بازگشت به منوی اصلی", callback_data="back_main")]
-            ])
-        )
-
-    # ===== سایر منوها =====
     elif data == "menu_status":
         await status_command(update, context)
 
