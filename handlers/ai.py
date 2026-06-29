@@ -9,7 +9,7 @@ from database import (
     save_message, get_recent_history, get_memories,
     get_web_search_status, get_user_personality
 )
-from personalities import get_personality
+from personalities import get_system_prompt
 from ddgs import DDGS
 from handlers.summarize import extract_url_content, get_summary
 
@@ -129,7 +129,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     memories = await get_memories(user_id)
 
     personality_name = await get_user_personality(user_id)
-    personality_prompt = get_personality(personality_name)
+    personality_prompt = get_system_prompt(personality_name)
 
     web_search_enabled = await get_web_search_status(user_id)
 
