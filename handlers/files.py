@@ -6,8 +6,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 from config import FREELLMAPI_KEY, FREELLMAPI_URL
 from database import save_message, get_user_personality
-from personalities import get_personality
-from handlers.vision import handle_photo  # برای عکس‌های ارسال‌شده به‌صورت document
+from personalities import get_system_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -148,7 +147,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     question = (msg.caption or "این فایل را به فارسی خلاصه و نکات کلیدی‌اش را استخراج کن.").strip()
     await processing.edit_text("🧠 در حال تحلیل محتوای فایل...")
 
-    personality_prompt = get_personality(await get_user_personality(user_id))
+    personality_prompt = get_system_prompt(await get_user_personality(user_id))
     system_prompt = (
         f"{personality_prompt}\n\n"
         "تو تحلیل‌گر سند هستی. همیشه فارسی پاسخ بده، ساختار پاسخ تمیز و خوانا باشد."
