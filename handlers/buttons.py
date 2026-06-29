@@ -14,6 +14,7 @@ from handlers.personality import (
     show_personality_menu, personality_set, personality_nsfw_confirm,
 )
 from handlers.websearch import websearch_menu, websearch_callback
+from handlers.imagegen import image_command
 from handlers.market import get_gold_price, get_usd_price, get_today_date
 
 
@@ -86,6 +87,29 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif data == "menu_help":
         await help_command(update, context)
+
+    # ===== تحلیل عکس/فایل =====
+    elif data == "menu_media":
+        await query.edit_message_text(
+            "🖼 **تحلیل عکس و فایل**\n\n"
+            "• یک **عکس** بفرست (با caption دلخواه = سوال شما) تا تحلیل و توصیف کنم.\n"
+            "• یک **فایل** (PDF, DOCX, TXT, MD, CSV, JSON یا کد) بفرست تا خلاصه/پاسخ بدم.\n\n"
+            "📌 حداکثر حجم فایل: ۲۰ مگابایت.\n"
+            "📌 بدون caption: به‌طور خودکار خلاصه می‌شود.",
+            parse_mode="Markdown"
+        )
+
+    # ===== ساخت عکس =====
+    elif data == "menu_imagegen":
+        context.user_data["awaiting_image_prompt"] = True
+        await query.edit_message_text(
+            "🎨 **ساخت عکس**\n\n"
+            "توضیح عکسی که می‌خوای بسازم رو در پیام بعدی بفرست.\n"
+            "مثال: «یک گربه فضانورد روی ماه، سبک کارتونی»\n\n"
+            "برای لغو: /cancel",
+            parse_mode="Markdown"
+        )
+
 
     # ===== منوی شخصیت =====
     elif data == "menu_personality":
